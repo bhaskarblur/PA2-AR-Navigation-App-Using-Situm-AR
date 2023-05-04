@@ -1,0 +1,117 @@
+plugins {
+    id 'com.android.application'
+}
+
+android {
+    namespace 'com.example.indoortracking'
+    compileSdk 33
+
+    defaultConfig {
+        applicationId "com.example.indoortracking"
+        minSdk 24
+        targetSdk 33
+        versionCode 1
+        versionName "1.0"
+
+        testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+        }
+        buildFeatures {
+            viewBinding true
+        }
+
+    }
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_1_8
+        targetCompatibility JavaVersion.VERSION_1_8
+    }
+}
+
+dependencies {
+    implementation 'de.javagl:obj:0.2.1'
+    implementation 'com.google.ar:core:1.36.0'
+    // Provides ARCore Session and related resources
+
+    // Provides ArFragment, and other UX resources.
+    implementation 'com.google.ar.sceneform.ux:sceneform-ux:1.17.1'
+
+    // Alternatively, use ArSceneView without the UX dependency.
+    implementation 'com.google.ar.sceneform:core:1.17.1'
+    implementation ('es.situm:situm-sdk:2.85.3@aar') {
+        transitive = true
+    }
+    implementation ('es.situm:situm-wayfinding:0.26.1-alpha@aar') {
+        transitive = true
+    }
+    implementation 'com.facebook.shimmer:shimmer:0.5.0@aar'
+    implementation 'com.google.ar.sceneform:assets:1.17.1'
+    def lottieVersion = "3.4.0"
+    implementation 'com.google.android.flexbox:flexbox:3.0.0'
+    implementation "com.airbnb.android:lottie:$lottieVersion"
+    // implementation 'me.bendik.simplerangeview:simplerangeview:0.2.0'
+    implementation 'com.google.android.material:material:1.7.0'
+    implementation 'com.google.firebase:firebase-messaging-directboot:23.1.0'
+    implementation 'com.google.firebase:firebase-messaging:23.1.0'
+    implementation 'com.google.firebase:firebase-core:21.1.1'
+    implementation 'com.google.android.gms:play-services-location:21.0.1'
+    implementation 'com.google.android.gms:play-services-maps:18.1.0'
+    implementation 'com.google.code.gson:gson:2.8.9'
+    implementation("com.vanniktech:android-image-cropper:4.5.0")
+    //implementation 'com.theartofdev.edmodo:android-image-cropper:2.8+'
+    implementation 'com.squareup.retrofit2:retrofit:2.9.0'// compulsory
+    implementation 'com.google.android.gms:play-services-location:21.0.1'
+    implementation 'com.squareup.retrofit2:converter-gson:2.9.0' //for retrofit conversion
+    implementation 'androidx.constraintlayout:constraintlayout:2.1.4'
+    implementation 'jp.wasabeef:picasso-transformations:2.4.0'
+    implementation 'com.squareup.picasso:picasso:2.8'
+    implementation 'androidx.multidex:multidex:2.0.1'
+    implementation "androidx.viewpager2:viewpager2:1.0.0"
+    // Retrofit & OkHttp
+    implementation "com.squareup.okhttp3:okhttp:4.9.0"
+    implementation 'com.squareup.retrofit2:retrofit:2.9.0'
+    implementation 'com.squareup.retrofit2:converter-gson:2.9.0'
+    implementation 'androidx.legacy:legacy-support-v4:1.0.0'
+    implementation 'androidx.constraintlayout:constraintlayout:2.1.4'
+    implementation 'com.google.firebase:firebase-auth:21.1.0'
+    implementation 'com.google.android.gms:play-services-auth:20.4.1'
+    implementation 'com.google.firebase:firebase-database:20.1.0'
+    implementation 'com.google.firebase:firebase-storage:20.1.0'
+    implementation 'com.google.firebase:firebase-messaging:23.1.1'
+    implementation 'com.google.firebase:firebase-crashlytics:18.3.3'
+    implementation 'com.google.firebase:firebase-analytics:21.2.0'
+    implementation 'com.google.firebase:firebase-crashlytics'
+    implementation 'com.google.firebase:firebase-analytics'
+    implementation 'com.google.firebase:firebase-crashlytics-buildtools:2.9.2'
+    def lifecycle_version = "2.5.1"
+    def arch_version = "2.1.0"
+    implementation "androidx.lifecycle:lifecycle-viewmodel:$lifecycle_version"
+    //noinspection GradleDependency
+    implementation 'com.google.android.material:material:1.4.0'
+    implementation "androidx.lifecycle:lifecycle-livedata:$lifecycle_version"
+    implementation "androidx.lifecycle:lifecycle-runtime:$lifecycle_version"
+    implementation 'androidx.core:core:1.9.0'
+
+    implementation "androidx.lifecycle:lifecycle-viewmodel-savedstate:$lifecycle_version"
+    //noinspection LifecycleAnnotationProcessorWithJava8
+    annotationProcessor "androidx.lifecycle:lifecycle-compiler:$lifecycle_version"
+    implementation 'pl.droidsonroids.gif:android-gif-drawable:1.2.19'
+
+
+    implementation 'androidx.appcompat:appcompat:1.5.1'
+    implementation 'com.google.android.material:material:1.8.0'
+    implementation 'androidx.constraintlayout:constraintlayout:2.1.4'
+    testImplementation 'junit:junit:'
+    androidTestImplementation 'androidx.test.ext:junit:1.1.4'
+    androidTestImplementation 'androidx.test.espresso:espresso-core:3.5.1'
+    implementation 'androidx.core:core-ktx:1.9.0'
+    implementation 'androidx.appcompat:appcompat:1.6.0'
+    implementation 'com.google.android.material:material:1.8.0'
+    testImplementation 'junit:junit:4.13.2'
+    androidTestImplementation 'androidx.test.ext:junit:1.1.5'
+    androidTestImplementation 'androidx.test.espresso:espresso-core:3.5.1'
+}

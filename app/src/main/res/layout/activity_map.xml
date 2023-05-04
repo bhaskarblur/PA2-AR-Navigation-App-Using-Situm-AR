@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    tools:context=".mapActivity">
+
+    <es.situm.wayfinding.SitumMapView
+        android:layout_height="match_parent"
+        android:layout_width="match_parent"
+        android:id="@+id/maps_library_target_"
+        app:situm_has_search_view="false"
+        android:visibility="gone"
+        app:situm_enable_autostart_positioning="true">
+
+    </es.situm.wayfinding.SitumMapView>
+    <FrameLayout
+        android:id="@+id/maps_library_target"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        app:situm_has_search_view="false"
+        app:situm_user_position_icon="situm_position_icon.png"
+        app:situm_user_position_arrow_icon="situm_position_icon_arrow.png"
+        app:situm_enable_autostart_positioning="true">
+
+    </FrameLayout>
+
+</androidx.constraintlayout.widget.ConstraintLayout>

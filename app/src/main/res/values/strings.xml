@@ -1,0 +1,33 @@
+<resources>
+    <string name="app_name">IndoorTracking</string>
+    <string name="search_key_hint">Key name...</string>
+    <string name="search_value_hint">Value name...</string>
+    <string name="dismiss">Dismiss</string>
+    <string name="dont_show">Do not show again</string>
+    <string name="user_inside_event">You are inside an event</string>
+    <string name="no_events_in_building">There are not events in the building. You can create them in the Dashboard</string>
+    <string name="retry">Retry</string>
+    <string name="tv_select_points">Select two points in the map</string>
+    <string name="situm_license_expired_button_upgrade">Expired</string>
+    <string name="situm_license_expired_email_title_upgrad">Expired</string>
+    <plurals name="success_result">
+        <item quantity="one">%s success: %d result</item>
+        <item quantity="other">%s success: %d results</item>
+    </plurals>
+
+    <string name="depth_use_explanation" translatable="false">When Depth is enabled on supported devices, virtual objects adapt to the environment by blending in with the real world.</string>
+    <string name="button_text_enable_depth" translatable="false">Enable</string>
+    <string name="button_text_disable_depth" translatable="false">Disable</string>
+    <string name="options_title_with_depth" translatable="false">Your device supports depth</string>
+    <string name="options_title_without_depth" translatable="false">Your device does not support depth</string>
+    <string name="done" translatable="false">Done</string>
+    <string-array name="depth_options_array" translatable="false">
+        <item>Enable depth</item>
+        <item>Show depth map</item>
+    </string-array>
+    <string name="options_title_instant_placement" translatable="false">Instant Placement options</string>
+    <string-array name="instant_placement_options_array" translatable="false">
+        <item>Enable Instant Placement</item>
+    </string-array>
+
+</resources>
