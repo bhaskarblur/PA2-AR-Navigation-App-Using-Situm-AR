@@ -80,22 +80,22 @@ public class FloorSelectorView extends ConstraintLayout {
         floorAdapter.positioningFloorChangedTo(null, false);
         lastFloorSelected = floorAdapter.getSelected();
         isFirstCameraAnimation = true;
-        fetchFloorsFromBuilding();
+       // fetchFloorsFromBuilding();
     }
 
     /**
      * Sets the GoogleMap and Building
      */
-    public void setFloorSelector(Building building, GoogleMap map) {
+    public void setFloorSelector(Building building, GoogleMap map, String floorId) {
         this.building = building;
         this.map = map;
-        fetchFloorsFromBuilding();
+        fetchFloorsFromBuilding(floorId);
     }
 
     /**
      * Iterates the collection building's floors with the method fetchFloorsFromBuilding() of SitumSdk, stores them in reverse order.
      */
-    private void fetchFloorsFromBuilding() {
+    private void fetchFloorsFromBuilding(String floorId) {
 
         SitumSdk.communicationManager().fetchFloorsFromBuilding(building.getIdentifier(), new Handler<Collection<Floor>>() {
             @Override
@@ -104,7 +104,7 @@ public class FloorSelectorView extends ConstraintLayout {
                 // First, store in the reverse order the collection
                 floorList = new ArrayList<>(floorsCollection);
                 Collections.reverse(floorList);
-
+                updatePositioningFloor(floorId);
                 // Once we got the floors we prepare de selector
                 prepareSelector();
             }

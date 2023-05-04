@@ -9,11 +9,12 @@ import android.graphics.Bitmap;
 import android.os.Bundle;
 import android.os.Handler;
 import android.util.Log;
+import android.view.View;
 import android.widget.ProgressBar;
 import android.widget.Toast;
 
 import com.example.indoortracking.common.floorselector.FloorSelectorView;
-import com.example.indoortracking.databinding.ActivityAractivityBinding;
+import com.example.indoortracking.databinding.ActivityMapBinding;
 import com.google.android.gms.common.api.ApiException;
 import com.google.android.gms.common.api.ResolvableApiException;
 import com.google.android.gms.location.LocationServices;
@@ -31,21 +32,31 @@ import com.google.android.gms.maps.model.LatLng;
 import com.google.android.gms.maps.model.LatLngBounds;
 import com.google.android.gms.maps.model.MapStyleOptions;
 import com.google.android.gms.maps.model.MarkerOptions;
+import com.google.android.gms.maps.model.Polyline;
+import com.google.android.gms.maps.model.PolylineOptions;
 import com.google.android.gms.tasks.OnCompleteListener;
 import com.google.android.gms.tasks.Task;
 
+import java.util.ArrayList;
 import java.util.Collection;
+import java.util.List;
 
 import es.situm.sdk.SitumSdk;
+import es.situm.sdk.directions.DirectionsRequest;
 import es.situm.sdk.error.Error;
 import es.situm.sdk.location.LocationListener;
 import es.situm.sdk.location.LocationManager;
 import es.situm.sdk.location.LocationRequest;
 import es.situm.sdk.location.LocationStatus;
+import es.situm.sdk.location.util.CoordinateConverter;
 import es.situm.sdk.model.cartography.Building;
 import es.situm.sdk.model.cartography.BuildingInfo;
 import es.situm.sdk.model.cartography.Floor;
 import es.situm.sdk.model.cartography.Poi;
+import es.situm.sdk.model.cartography.Point;
+import es.situm.sdk.model.directions.Route;
+import es.situm.sdk.model.directions.RouteSegment;
+import es.situm.sdk.model.location.CartesianCoordinate;
 import es.situm.sdk.model.location.Coordinate;
 import es.situm.sdk.model.location.Location;
 import es.situm.wayfinding.LibrarySettings;
@@ -63,28 +74,38 @@ public class mapActivity extends AppCompatActivity implements OnMapReadyCallback
     private LocationManager locationManager;
     private Coordinate targetCoordinate =
             new Coordinate(30.919247, 75.831841);
+    private List<Polyline> polylines = new ArrayList<>();
+    private CoordinateConverter coordinateConverter;
     private commons commons;
     private boolean isNavigating = false;
     private boolean arrived=false;
     private GoogleMap googleMap;
+    private LatLng current;
     private LocationListener locationListener;
-    private ActivityAractivityBinding binding;
+    private ActivityMapBinding binding;
     private Circle circle;
     // To store the building information after we retrieve it
     private BuildingInfo buildingInfo_;
     private GetPoisUseCase getPoisUseCase;
     private GetPoiCategoryIconUseCase getPoiCategoryIconUseCase = new GetPoiCategoryIconUseCase();
     private ProgressBar progressBar;
+    private Point pointOrigin;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        setContentView(R.layout.activity_map);
+        binding = ActivityMapBinding.inflate(getLayoutInflater());
+        setContentView(binding.getRoot());
         commons = new commons();
         enableLoc();
         SitumSdk.init(mapActivity.this);
       //  loadMap();
         load_map2();
+        manageLogic();
+    }
+
+    private void manageLogic() {
+        //googleMap.animateCamera(CameraUpdateFactory.newLatLngZoom(current, 25));
     }
 
     private void load_map2() {
@@ -135,6 +156,7 @@ public class mapActivity extends AppCompatActivity implements OnMapReadyCallback
 
 
     private void startLocation() {
+
         if (locationManager.isRunning()) {
             return;
         }
@@ -142,8 +164,10 @@ public class mapActivity extends AppCompatActivity implements OnMapReadyCallback
 
             @Override
             public void onLocationChanged(@NonNull Location location) {
+                //place marker on map when location loaded!
                 LatLng latLng = new LatLng(location.getCoordinate().getLatitude(),
                         location.getCoordinate().getLongitude());
+                current=latLng;
                 if (circle == null) {
                     circle = googleMap.addCircle(new CircleOptions()
                             .center(latLng)
@@ -153,10 +177,29 @@ public class mapActivity extends AppCompatActivity implements OnMapReadyCallback
                                     .strokeColor(getResources().getColor(R.color.white))
                             .fillColor(getResources().getColor(R.color.redPrimary)));
 
+                    //create route to all the pois
                 }else{
                     circle.setCenter(latLng);
                 }
                 googleMap.animateCamera(CameraUpdateFactory.newLatLngZoom(latLng, 25));
+                hideProgress();
+                SitumSdk.communicationManager().fetchIndoorPOIsFromBuilding(buildingId, new es.situm.sdk.utils.Handler<Collection<Poi>>() {
+                    @Override
+                    public void onSuccess(Collection<Poi> pois) {
+                        for(Poi poi: pois) {
+                            if(latLng!=null) {
+                                calculateRoute(latLng, poi.getCoordinate(), poi.getCartesianCoordinate());
+                            }
+                            }
+
+                    }
+
+                    @Override
+                    public void onFailure(Error error) {
+
+                    }
+                });
+
             }
 
 
@@ -235,6 +278,16 @@ public class mapActivity extends AppCompatActivity implements OnMapReadyCallback
         });
     }
 
+    private void hideProgress() {
+                binding.progressBar2.setVisibility(View.GONE);
+                binding.mapsLibraryTarget.setVisibility(View.VISIBLE);
+                binding.emrLayout.setVisibility(View.VISIBLE);
+    }
+
+    private void showProgress() {
+        binding.progressBar2.setVisibility(View.VISIBLE);
+    }
+
     private void enableLoc() {
 
         com.google.android.gms.location.LocationRequest locationRequest = com.google.android.gms.location.LocationRequest.create();
@@ -311,6 +364,7 @@ public class mapActivity extends AppCompatActivity implements OnMapReadyCallback
 
     @Override
     public void onMapReady(@NonNull GoogleMap googleMap) {
+
         this.googleMap = googleMap;
         googleMap.getUiSettings().setMapToolbarEnabled(false);
         googleMap.getUiSettings().setMyLocationButtonEnabled(false);
@@ -318,15 +372,20 @@ public class mapActivity extends AppCompatActivity implements OnMapReadyCallback
         googleMap.setMapStyle(
                 MapStyleOptions.loadRawResourceStyle(
                         this, R.raw.google_map_style));
-        startLocation();
+
+
         SitumSdk.communicationManager().fetchBuildingInfo(buildingId, new es.situm.sdk.utils.Handler<BuildingInfo>() {
             @Override
             public void onSuccess(BuildingInfo buildingInfo) {
+                coordinateConverter = new CoordinateConverter(buildingInfo.getBuilding().getDimensions(),
+                        buildingInfo.getBuilding().getCenter(),buildingInfo.getBuilding().getRotation());
                 buildingInfo_=buildingInfo;
                FloorSelectorView floorSelectorView = findViewById(R.id.situm_floor_selector);
-                floorSelectorView.setFloorSelector(buildingInfo.getBuilding(), googleMap);
+                floorSelectorView.setFloorSelector(buildingInfo.getBuilding(), googleMap, targetFloorId);
                 getPoisUseCase= new GetPoisUseCase(buildingInfo.getBuilding());
                 getPois(googleMap);
+                startLocation();
+
             }
 
             @Override
@@ -335,14 +394,82 @@ public class mapActivity extends AppCompatActivity implements OnMapReadyCallback
             }
         });
 
-
-
     }
 
+    private void calculateRoute(LatLng current, Coordinate destination, CartesianCoordinate _cartesianDestination) {
+        pointOrigin = createPoint(current);
+        Point pointDestination =  new Point(buildingId,targetFloorId,destination,_cartesianDestination);
+        DirectionsRequest directionsRequest = new DirectionsRequest.Builder()
+                .from(pointOrigin, null)
+                .to(pointDestination)
+                .build();
+        SitumSdk.directionsManager().requestDirections(directionsRequest, new es.situm.sdk.utils.Handler<Route>() {
+            @Override
+            public void onSuccess(Route route) {
+                drawRoute(route);
+                centerCamera(route);
+                hideProgress();
+                pointOrigin = null;
+            }
+
+            @Override
+            public void onFailure(Error error) {
+                hideProgress();
+                clearMap();
+                pointOrigin = null;
+                Toast.makeText(mapActivity.this, error.getMessage(), Toast.LENGTH_LONG).show();
+            }
+        });
+    }
+
+    private void clearMap(){
+        removePolylines();
+    }
+
+    private Point createPoint(LatLng latLng) {
+        Coordinate coordinate = new Coordinate(latLng.latitude, latLng.longitude);
+        CartesianCoordinate cartesianCoordinate= coordinateConverter.toCartesianCoordinate(coordinate);
+        Point point = new Point(buildingId, targetFloorId,coordinate,cartesianCoordinate );
+        return point;
+    }
+
+    private void removePolylines() {
+        for (Polyline polyline : polylines) {
+            polyline.remove();
+        }
+        polylines.clear();
+    }
+
+    private void drawRoute(Route route) {
+        for (RouteSegment segment : route.getSegments()) {
+            //For each segment you must draw a polyline
+            //Add an if to filter and draw only the current selected floor
+            List<LatLng> latLngs = new ArrayList<>();
+            for (Point point : segment.getPoints()) {
+                latLngs.add(new LatLng(point.getCoordinate().getLatitude(), point.getCoordinate().getLongitude()));
+            }
+
+            PolylineOptions polyLineOptions = new PolylineOptions()
+                    .color(getResources().getColor(R.color.black))
+                    .width(12f)
+                    .addAll(latLngs);
+            polylines.add(googleMap.addPolyline(polyLineOptions));
+        }
+    }
+
+    private void centerCamera(Route route) {
+        Coordinate from = route.getFrom().getCoordinate();
+        Coordinate to = route.getTo().getCoordinate();
+
+        LatLngBounds.Builder builder = new LatLngBounds.Builder()
+                .include(new LatLng(from.getLatitude(), from.getLongitude()))
+                .include(new LatLng(to.getLatitude(), to.getLongitude()));
+        googleMap.animateCamera(CameraUpdateFactory.newLatLngBounds(builder.build(), 100));
+    }
     @Override
     public void finish() {
         getPoisUseCase.cancel();
-        locationManager.removeUpdates(locationListener);
+        stopLocation();
         super.finish();
     }
 }

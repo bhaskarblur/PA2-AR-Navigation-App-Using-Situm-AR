@@ -66,9 +66,9 @@
         android:layout_height="@dimen/situm_markers_topBottom_height"
         android:src="@drawable/ic_situm_floor_selector_arrow_bottom"
         android:visibility="gone"
-        app:layout_constraintTop_toBottomOf="@+id/recycler_level_list_wrapper"
-        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintBottom_toBottomOf="parent"/>
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@+id/recycler_level_list_wrapper" />
 
 </androidx.constraintlayout.widget.ConstraintLayout>
