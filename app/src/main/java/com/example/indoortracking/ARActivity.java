@@ -192,7 +192,6 @@ public class ARActivity extends AppCompatActivity implements Scene.OnUpdateListe
         binding.close.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
-                startActivity(new Intent(ARActivity.this, mapActivity.class));
                 finish();
                 overridePendingTransition(R.anim.slide_in_right,R.anim.slide_out_right);
             }
