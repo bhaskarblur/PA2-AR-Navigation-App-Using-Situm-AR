@@ -73,6 +73,9 @@
             android:name="com.google.ar.core"
             android:value="required" />
 
+        <meta-data
+            android:name="com.google.android.ar.API_KEY"
+            android:value="AIzaSyBOrhG7x-VeAoUivTteQ9RvDvufoerV2MM"/>
         <activity
             android:name=".mapActivity"
             android:exported="false" />

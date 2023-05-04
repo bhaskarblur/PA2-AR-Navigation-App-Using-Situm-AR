@@ -9,10 +9,16 @@ import androidx.appcompat.app.AppCompatActivity;
 import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.IntentSender;
+import android.content.pm.PackageManager;
+import android.content.pm.ResolveInfo;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
+import android.media.AudioManager;
+import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
+import android.speech.tts.TextToSpeech;
+import android.speech.tts.UtteranceProgressListener;
 import android.util.Log;
 import android.view.View;
 import android.widget.ProgressBar;
@@ -44,7 +50,9 @@ import com.google.android.gms.tasks.Task;
 
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 
 import es.situm.sdk.SitumSdk;
 import es.situm.sdk.directions.DirectionsRequest;
@@ -102,6 +110,8 @@ public class mapActivity extends AppCompatActivity implements OnMapReadyCallback
     private GetPoiCategoryIconUseCase getPoiCategoryIconUseCase = new GetPoiCategoryIconUseCase();
     private ProgressBar progressBar;
     private Point pointOrigin;
+    private int TTS_CHECK_CODE=111;
+    private TextToSpeech tts;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -113,9 +123,68 @@ public class mapActivity extends AppCompatActivity implements OnMapReadyCallback
         SitumSdk.init(mapActivity.this);
       //  loadMap();
         load_map2();
+        setupTTs();
+
+
+    }
+    private void setupTTs() {
+        PackageManager pm = getPackageManager();
+        Intent installIntent = new Intent();
+        installIntent.setAction(TextToSpeech.Engine.ACTION_CHECK_TTS_DATA);
+        ResolveInfo resolveInfo = pm.resolveActivity( installIntent, PackageManager.MATCH_DEFAULT_ONLY );
+
+        if( resolveInfo == null ) {
+            Toast.makeText(this, "Voice commands not supported!", Toast.LENGTH_SHORT).show();
+            // Not able to find the activity which should be started for this intent
+        } else {
+            startActivityForResult(installIntent, TTS_CHECK_CODE);
+        }
+
+        tts= new TextToSpeech(this, new TextToSpeech.OnInitListener() {
+            @Override
+            public void onInit(int status) {
+                if(status!=TextToSpeech.ERROR){
+                    // To Choose language of speech
+                    tts.setLanguage(Locale.ENGLISH);
+                    tts.setEngineByPackageName("com.google.android.tts");
+                }
+                else {
+                    Toast.makeText(mapActivity.this, String.valueOf(status), Toast.LENGTH_SHORT).show();
+                }
+
+
+
+            }
+        });
+        binding.emrText.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+           //     speakTTs("hi there!");
+            }
+        });
+
 
     }
 
+    private void speakTTs(String text) {
+        if(!tts.isSpeaking()) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+                Log.d(TAG, "Speak new API");
+
+                Bundle bundle = new Bundle();
+                bundle.putInt(TextToSpeech.Engine.KEY_PARAM_STREAM, AudioManager.STREAM_MUSIC);
+                tts.speak(text, TextToSpeech.QUEUE_FLUSH, bundle, "1");
+            } else {
+                Log.d(TAG, "Speak old API");
+                HashMap<String, String> param = new HashMap<>();
+                param.put(TextToSpeech.Engine.KEY_PARAM_STREAM, String.valueOf(AudioManager.STREAM_MUSIC));
+                tts.speak(text, TextToSpeech.QUEUE_FLUSH, param);
+
+            }
+
+        }
+
+    }
     private void manageLogic() {
         binding.arCamButton.setOnClickListener(new View.OnClickListener() {
             @Override
@@ -142,7 +211,10 @@ public class mapActivity extends AppCompatActivity implements OnMapReadyCallback
                 clearMap();
                 binding.buttonsLayout.setVisibility(View.GONE);
                 showAllRoutes=true;
-                locationManager.removeUpdates(locationListener_);
+                if(locationListener_!=null) {
+                    locationManager.removeUpdates(locationListener_);
+                    locationListener_=null;
+                }
                 showProgress();
 
             }
@@ -175,7 +247,6 @@ public class mapActivity extends AppCompatActivity implements OnMapReadyCallback
                                 binding.buttonsLayout.setVisibility(View.VISIBLE);
                                 // Navigate the user now, use navigation start and listener.
                                 //calculateSingleRoute(current,coordinate,cartesianCoordinate);
-                                hideProgress();
                                 setupNavigation();
                             }
                         }
@@ -295,7 +366,8 @@ public class mapActivity extends AppCompatActivity implements OnMapReadyCallback
         LocationRequest locationRequest = new LocationRequest.Builder().
                 useWifi(true).useBle(true).
                 buildingIdentifier(buildingId).
-                build();
+                useDeadReckoning(true)
+                .build();
         SitumSdk.locationManager().
                 requestLocationUpdates(locationRequest, locationListener_);
 
@@ -354,7 +426,6 @@ public class mapActivity extends AppCompatActivity implements OnMapReadyCallback
         public void onDestinationReached() {
             Log.i(TAG, "Destination Reached");
             isNavigating = false;
-
             hideProgress();
             if(!arrived) {
                 AlertDialog.Builder builder = new AlertDialog.Builder(mapActivity.this);
@@ -387,7 +458,7 @@ public class mapActivity extends AppCompatActivity implements OnMapReadyCallback
           //  getPoisUseCase= new GetPoisUseCase(buildingInfo_.getBuilding());
           //  getPois(googleMap);
             Log.d("navigation", navigationProgress.toString());
-
+            speakTTs(navigationProgress.getCurrentIndication().toText(mapActivity.this));
             drawChosenRoute(navigationProgress.getSegments());
 //            Log.i(TAG, "Current indication " + navigationProgress.getCurrentIndication().toText(ARActivity.this));
 //            Log.i(TAG, "Next indication " + navigationProgress.getNextIndication().toText(ARActivity.this));
@@ -410,7 +481,7 @@ public class mapActivity extends AppCompatActivity implements OnMapReadyCallback
 
         @Override
         public void onUserOutsideRoute() {
-            Log.i(TAG, "User outside of route");
+            Toast.makeText(mapActivity.this, "You are going outside the route", Toast.LENGTH_SHORT).show();
             isNavigating = false;
             SitumSdk.navigationManager().removeUpdates();
         }
@@ -488,6 +559,7 @@ public class mapActivity extends AppCompatActivity implements OnMapReadyCallback
         LocationRequest locationRequest = new LocationRequest.Builder()
                 .useWifi(true)
                 .useBle(true)
+                .useDeadReckoning(true)
                 .useForegroundService(true)
                 .build();
         locationManager.requestLocationUpdates(locationRequest, locationListener);
@@ -655,7 +727,7 @@ public class mapActivity extends AppCompatActivity implements OnMapReadyCallback
                     if(floor.getIdentifier().equals(targetFloorId)) {
                         binding.buildingInfo.setText(buildingInfo.getBuilding().getName() +", floor: "+ floor.getName().toString());
                         binding.emrText.setText("There is an emergency in "+buildingInfo.getBuilding().getName()+" at floor "+
-                                floor.getIdentifier()+". Please choose the closest route to exit.");
+                                floor.getName()+". Please choose the closest route to exit.");
                     }
 
                 }
@@ -799,12 +871,16 @@ public class mapActivity extends AppCompatActivity implements OnMapReadyCallback
         if(locationManager!=null) {
             startLocation();
         }
+        if(locationListener_!=null) {
+            setupNavigation();
+        }
     }
 
     @Override
     public void finish() {
         getPoisUseCase.cancel();
         stopLocation();
+        SitumSdk.navigationManager().removeUpdates();
         super.finish();
     }
 }

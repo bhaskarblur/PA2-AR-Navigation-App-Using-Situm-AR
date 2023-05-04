@@ -117,19 +117,19 @@
 
             <ImageView
                 android:id="@+id/imageView3"
-                android:layout_width="28dp"
-                android:layout_height="28dp"
-                android:layout_marginBottom="2dp"
+                android:layout_width="20dp"
+                android:layout_height="20dp"
+                android:layout_marginBottom="8dp"
                 app:layout_constraintBottom_toBottomOf="parent"
                 app:layout_constraintStart_toStartOf="parent"
-                app:srcCompat="@drawable/situm_about"
-                app:tint="@color/redPrimary" />
+                app:layout_constraintTop_toTopOf="parent"
+                app:srcCompat="@drawable/info_icon" />
 
             <TextView
                 android:id="@+id/buildingInfo"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginStart="12dp"
+                android:layout_marginStart="10dp"
                 android:layout_marginEnd="80dp"
                 android:layout_marginBottom="8dp"
                 android:fontFamily="@font/montregular"

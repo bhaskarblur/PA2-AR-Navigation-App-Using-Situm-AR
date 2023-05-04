@@ -28,6 +28,7 @@ import android.content.pm.PackageManager;
 import android.content.pm.ResolveInfo;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
+
 import android.media.AudioManager;
 import android.net.Uri;
 import android.os.Build;
@@ -46,6 +47,7 @@ import com.google.android.gms.location.LocationServices;
 import com.google.android.gms.location.LocationSettingsRequest;
 import com.google.android.gms.location.LocationSettingsResponse;
 import com.google.android.gms.location.LocationSettingsStatusCodes;
+import com.google.android.gms.maps.model.LatLng;
 import com.google.android.gms.tasks.OnCompleteListener;
 import com.google.android.gms.tasks.Task;
 import com.google.ar.core.Anchor;
@@ -53,12 +55,17 @@ import com.google.ar.core.ArCoreApk;
 import com.google.ar.core.AugmentedImage;
 import com.google.ar.core.AugmentedImageDatabase;
 import com.google.ar.core.Config;
+import com.google.ar.core.Earth;
 import com.google.ar.core.Frame;
+import com.google.ar.core.FutureState;
+import com.google.ar.core.GeospatialPose;
 import com.google.ar.core.HitResult;
 import com.google.ar.core.Plane;
 import com.google.ar.core.Pose;
 import com.google.ar.core.Session;
 import com.google.ar.core.TrackingState;
+import com.google.ar.core.VpsAvailability;
+import com.google.ar.core.VpsAvailabilityFuture;
 import com.google.ar.core.exceptions.UnavailableApkTooOldException;
 import com.google.ar.core.exceptions.UnavailableArcoreNotInstalledException;
 import com.google.ar.core.exceptions.UnavailableDeviceNotCompatibleException;
@@ -75,7 +82,10 @@ import com.google.ar.sceneform.assets.RenderableSource;
 import com.google.ar.sceneform.collision.Ray;
 import com.google.ar.sceneform.math.Quaternion;
 import com.google.ar.sceneform.math.Vector3;
+import com.google.ar.sceneform.rendering.Color;
+import com.google.ar.sceneform.rendering.MaterialFactory;
 import com.google.ar.sceneform.rendering.ModelRenderable;
+import com.google.ar.sceneform.rendering.ShapeFactory;
 import com.google.ar.sceneform.ux.ArFragment;
 import com.google.ar.sceneform.ux.BaseArFragment;
 import com.google.ar.sceneform.ux.TransformableNode;
@@ -87,6 +97,7 @@ import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.function.Consumer;
 import java.util.function.Function;
 
 import es.situm.sdk.SitumSdk;
@@ -121,6 +132,9 @@ public class ARActivity extends AppCompatActivity implements Scene.OnUpdateListe
     private Node node;
     private int TTS_CHECK_CODE=111;
     private TextToSpeech tts;
+    AnchorNode startNode;
+    AnchorNode endNode;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -129,7 +143,8 @@ public class ARActivity extends AppCompatActivity implements Scene.OnUpdateListe
         SitumSdk.init(this);
         manageUI();
         setupTTs();
-        checkPermission("",103);
+
+        maybeEnableArButton();
        // fillbuildingData();
 
 
@@ -141,6 +156,7 @@ public class ARActivity extends AppCompatActivity implements Scene.OnUpdateListe
         // We retrieve the information first, to make sure that
         // we have all the required info afterwards.
 
+
         SitumSdk.communicationManager().fetchBuildingInfo(buildingId, new Handler<BuildingInfo>() {
             @Override
             public void onSuccess(BuildingInfo buildingInfo) {
@@ -148,15 +164,11 @@ public class ARActivity extends AppCompatActivity implements Scene.OnUpdateListe
                 Collection<Floor> floors = buildingInfo.getFloors();
                 Collection<Poi> indoorPOIs = buildingInfo.getIndoorPOIs();
 
-              //  for(Floor floor: floors) {
-                //    Toast.makeText(ARActivity.this, "FloorID: "
-                  //          +floors, Toast.LENGTH_SHORT).show();
-                //}
-
                 // ... and start positioning in that building
                 LocationRequest locationRequest = new LocationRequest.Builder().
                         useWifi(true).useBle(true).
                         buildingIdentifier(buildingId).
+                        useDeadReckoning(true).
                         build();
                 Log.i(TAG, "BuildingBasicInfo = [" + buildingInfo + "]");
                 for (Floor floor : floors) {
@@ -167,6 +179,8 @@ public class ARActivity extends AppCompatActivity implements Scene.OnUpdateListe
                 }
                   SitumSdk.locationManager().
                         requestLocationUpdates(locationRequest, locationListener);
+                  changeDirection("straight");
+
             }
 
             @Override
@@ -175,36 +189,6 @@ public class ARActivity extends AppCompatActivity implements Scene.OnUpdateListe
                 Toast.makeText(ARActivity.this, error.getMessage(), Toast.LENGTH_SHORT).show();
                 Log.d("communication", error.getMessage());
                 binding.progressBar.setVisibility(View.GONE);
-            }
-        });
-    }
-
-    private void fillbuildingData() {
-        // get data from intent;
-        Intent intent=getIntent();
-        Bundle bundle= intent.getBundleExtra("POIdata");
-        buildingId= bundle.getString("buildingId");
-        targetFloorId= bundle.getString("floorId");
-        POIid= bundle.getString("poiId");
-
-        targetCoordinate= new Coordinate(bundle.getDouble("PoicoordinateX"), bundle.getDouble("coordinateY"));
-    }
-
-    private void manageUI() {
-        arFragment= (ArFragment) getSupportFragmentManager().findFragmentById(R.id.arFragment);
-        binding.close.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View view) {
-                finish();
-                overridePendingTransition(R.anim.slide_in_right,R.anim.slide_out_right);
-            }
-        });
-
-
-        binding.startButton.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View view) {
-                speakTTs("hello");
             }
         });
     }
@@ -222,25 +206,154 @@ public class ARActivity extends AppCompatActivity implements Scene.OnUpdateListe
             startActivityForResult(installIntent, TTS_CHECK_CODE);
         }
 
+        tts= new TextToSpeech(this, new TextToSpeech.OnInitListener() {
+            @Override
+            public void onInit(int status) {
+                if(status!=TextToSpeech.ERROR){
+                    // To Choose language of speech
+                    tts.setLanguage(Locale.ENGLISH);
+                    tts.setEngineByPackageName("com.google.android.tts");
+                }
+                else {
+                    Toast.makeText(ARActivity.this, String.valueOf(status), Toast.LENGTH_SHORT).show();
+                }
+
+
+
+            }
+        });
+
 
     }
 
     private void speakTTs(String text) {
-         if(!tts.isSpeaking()) {
-             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-                 Log.v(TAG, "Speak new API");
-                 Bundle bundle = new Bundle();
-                 bundle.putInt(TextToSpeech.Engine.KEY_PARAM_STREAM, AudioManager.STREAM_MUSIC);
-                 tts.speak(text, TextToSpeech.QUEUE_FLUSH, bundle, null);
-             } else {
-                 Log.v(TAG, "Speak old API");
-                 HashMap<String, String> param = new HashMap<>();
-                 param.put(TextToSpeech.Engine.KEY_PARAM_STREAM, String.valueOf(AudioManager.STREAM_MUSIC));
-                 tts.speak(text, TextToSpeech.QUEUE_FLUSH, param);
-             }
+        if(!tts.isSpeaking()) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+                Log.d(TAG, "Speak new API");
+
+                Bundle bundle = new Bundle();
+                bundle.putInt(TextToSpeech.Engine.KEY_PARAM_STREAM, AudioManager.STREAM_MUSIC);
+                tts.speak(text, TextToSpeech.QUEUE_FLUSH, bundle, "1");
+            } else {
+                Log.d(TAG, "Speak old API");
+                HashMap<String, String> param = new HashMap<>();
+                param.put(TextToSpeech.Engine.KEY_PARAM_STREAM, String.valueOf(AudioManager.STREAM_MUSIC));
+                tts.speak(text, TextToSpeech.QUEUE_FLUSH, param);
+
+            }
+
         }
 
     }
+    private void fillbuildingData() {
+        // get data from intent;
+        Intent intent=getIntent();
+        Bundle bundle= intent.getBundleExtra("POIdata");
+        if(bundle!=null) {
+            buildingId = bundle.getString("buildingId");
+            targetFloorId = bundle.getString("floorId");
+            POIid = bundle.getString("poiId");
+            targetCoordinate = new Coordinate(bundle.getDouble("PoicoordinateX"), bundle.getDouble("PoicoordinateY"));
+        }
+    }
+
+    private void manageUI() {
+        arFragment= (ArFragment) getSupportFragmentManager().findFragmentById(R.id.arFragment);
+        binding.close.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                finish();
+                overridePendingTransition(R.anim.slide_in_right,R.anim.slide_out_right);
+            }
+        });
+
+
+    }
+
+    private void setPOIModel() {
+        Earth earth = mSession.getEarth();
+        VpsAvailabilityFuture future = mSession.checkVpsAvailabilityAsync(targetCoordinate.getLatitude(), targetCoordinate.getLongitude(), new Consumer<VpsAvailability>() {
+            @Override
+            public void accept(VpsAvailability vpsAvailability) {
+
+            }
+        });
+
+// Poll VpsAvailabilityFuture later, for example, in a render loop.
+        if (future.getState() == FutureState.DONE) {
+            switch (future.getResult()) {
+                case AVAILABLE:
+                    // VPS is available at this location.
+
+                    if (earth != null && earth.getTrackingState() == TrackingState.TRACKING) {
+                        GeospatialPose cameraGeospatialPose = earth.getCameraGeospatialPose();
+                        if (earth.getTrackingState() == TrackingState.TRACKING) {
+                           Anchor terrainAnchor =
+                                    earth.resolveAnchorOnTerrain(
+                                            /* Locational values */
+                                            targetCoordinate.getLatitude(),
+                                            targetCoordinate.getLongitude(),
+                                            2f,
+                                            /* Rotational pose values */
+                                            1,
+                                            1,
+                                            1,
+                                            1);
+
+                            switch (terrainAnchor.getTerrainAnchorState()) {
+                                case SUCCESS:
+                                    if (terrainAnchor.getTrackingState() == TrackingState.TRACKING) {
+                                        //renderAnchoredContent(terrainAnchor);
+                                        earth.createAnchor( targetCoordinate.getLatitude(),
+                                                targetCoordinate.getLongitude(),
+                                                2f,
+                                                /* Rotational pose values */
+                                                1,
+                                                1,
+                                                1,
+                                                1);
+
+                                    }
+                                    break;
+                                case TASK_IN_PROGRESS:
+                                    // ARCore is contacting the ARCore API to resolve the Terrain anchor's pose.
+                                    // Display some waiting UI.
+                                    break;
+                                case ERROR_UNSUPPORTED_LOCATION:
+                                    // The requested anchor is in a location that isn't supported by the Geospatial API.
+                                    break;
+                                case ERROR_NOT_AUTHORIZED:
+                                    // An error occurred while authorizing your app with the ARCore API. See
+                                    // https://developers.google.com/ar/reference/java/com/google/ar/core/Anchor.TerrainAnchorState#error_not_authorized
+                                    // for troubleshooting steps.
+                                    break;
+                                case ERROR_INTERNAL:
+                                    // The Terrain anchor could not be resolved due to an internal error.
+                                    break;
+                                case NONE:
+                                    // This Anchor isn't a Terrain anchor or it became invalid because the Geospatial Mode was
+                                    // disabled.
+                                    break;
+                            }
+                            // This anchor can't be used immediately; check its TrackingState
+                            // and TerrainAnchorState before rendering content on this anchor.
+                        }
+                        // cameraGeospatialPose contains geodetic location, rotation, and confidences values.
+                    }
+                    break;
+                case UNAVAILABLE:
+                    // VPS is unavailable at this location.
+                    break;
+                case ERROR_NETWORK_CONNECTION:
+                    // The external service could not be reached due to a network connection error.
+                    break;
+
+                // Handle other error states, e.g. ERROR_RESOURCE_EXHAUSTED, ERROR_INTERNAL, ...
+            }
+        }
+        
+    }
+
     public void setupImage(Config config, Session session) {
         Bitmap image= BitmapFactory.decodeResource(getResources(),R.drawable.arrow);
         AugmentedImageDatabase database= new AugmentedImageDatabase(session);
@@ -248,8 +361,36 @@ public class ARActivity extends AppCompatActivity implements Scene.OnUpdateListe
         config.setAugmentedImageDatabase(database);
     }
 
+    private void createLineBetweenAnchors() {
+
+        Vector3 startWorldPosition = startNode.getWorldPosition();
+        Vector3 endWorldPosition = endNode.getWorldPosition();
+        Vector3 difference = Vector3.subtract(endWorldPosition, startWorldPosition);
+        float length = difference.length();
+
+        // Create a cylinder with a height equal to the distance between anchors.
+        MaterialFactory.makeOpaqueWithColor(this,
+                        new Color(getResources().getColor(R.color.redPrimary)))
+                .thenAccept(material -> {
+                    ModelRenderable model = ShapeFactory.makeCylinder(0.04f, length, new Vector3(0f, length / 2, 0f), material);
+                    Node node = new Node();
+                    node.setRenderable(model);
+                    node.setParent(startNode);
+
+                    // Rotate the cylinder to align it with the line between anchors.
+                    Quaternion rotation = Quaternion.lookRotation(difference, Vector3.up());
+                    node.setWorldRotation(rotation);
+                });
+    }
+
     private void changeDirection(String rotate) {
 
+        arFragment.setOnTapArPlaneListener(new BaseArFragment.OnTapArPlaneListener() {
+            @Override
+            public void onTapPlane(HitResult hitResult, Plane plane, MotionEvent motionEvent) {
+                Toast.makeText(ARActivity.this, plane.getType().ordinal(), Toast.LENGTH_SHORT).show();
+            }
+        });
         ModelRenderable.builder().
                 setSource(
                         ARActivity.this,
@@ -293,11 +434,11 @@ public class ARActivity extends AppCompatActivity implements Scene.OnUpdateListe
             @Override
             public void onUpdate(FrameTime frameTime) {
                 Camera camera=arFragment.getArSceneView().getScene().getCamera();
-                Ray ray= camera.screenPointToRay(1180/2f, 1920/2f);
-                Vector3 newpos= ray.getPoint(1.8f);
+                Ray ray= camera.screenPointToRay(1580/2f, 1700);
+                Vector3 newpos= ray.getPoint(2f);
                 node.setLocalPosition(newpos);
                 if(rotate.equals("straight")) {
-                    node.setLocalRotation(Quaternion.axisAngle(new Vector3(0f, 1f, 0f), 90f));
+                    node.setLocalRotation(Quaternion.axisAngle(new Vector3(-.8f, 1.8f, 1.5f), 90f));
                 }
                 if(rotate.equals("left")) {
                     node.setLocalRotation(Quaternion.axisAngle(new Vector3(0f, 1f, 0f), 180f));
@@ -313,20 +454,6 @@ public class ARActivity extends AppCompatActivity implements Scene.OnUpdateListe
         });
 
 
-        if(rotate.equals("straight")) {
-          //  anchorNode.setLocalRotation(Quaternion.axisAngle(new Vector3(0, 0, 1f), -90f));
-        }
-        else if(rotate.equals("back")) {
-          //  anchorNode.setLocalRotation(Quaternion.axisAngle(new Vector3(0, 0, 1f), 90f));
-        }
-        else if(rotate.equals("left")) {
-            //anchorNode.setLocalRotation(Quaternion.axisAngle(new Vector3(0, 0, 1f), 180f));
-        }
-        else {
-            //anchorNode.setLocalRotation(Quaternion.axisAngle(new Vector3(0, 0, 1f), -90f));
-        }
-
-        //Toast.makeText(this, "Placed", Toast.LENGTH_SHORT).show();
 
     }
 
@@ -335,6 +462,7 @@ public class ARActivity extends AppCompatActivity implements Scene.OnUpdateListe
 
         @Override
         public void onLocationChanged(@NonNull Location location) {
+            Toast.makeText(ARActivity.this, "Hello2", Toast.LENGTH_SHORT).show();
             Log.i(TAG, "Updating User navigation with: location = [" + location + "]");
             if (isNavigating) {
                 SitumSdk.navigationManager().updateWithLocation(location);
@@ -354,6 +482,12 @@ public class ARActivity extends AppCompatActivity implements Scene.OnUpdateListe
 
         @Override
         public void onStatusChanged(@NonNull LocationStatus locationStatus) {
+            runOnUiThread(new Runnable() {
+                @Override
+                public void run() {
+                //    binding.statusText.setText(locationStatus.toString());
+                }
+            });
 
             Log.i(TAG, "User Location changed called with: status = [" + locationStatus + "]");
             if(locationStatus.toString().toLowerCase().contains("building")) {
@@ -364,6 +498,7 @@ public class ARActivity extends AppCompatActivity implements Scene.OnUpdateListe
 
         @Override
         public void onError(@NonNull Error error) {
+            Toast.makeText(ARActivity.this, error.getMessage(), Toast.LENGTH_SHORT).show();
             binding.statusText.setText("Couldn't access user location");
             binding.progressBar.setVisibility(View.GONE);
             Log.e(TAG, "User Location error called with: error = [" + error + "]");
@@ -577,26 +712,34 @@ public class ARActivity extends AppCompatActivity implements Scene.OnUpdateListe
             },200);
         }
         if (availability.isSupported()) {
-            binding.statusText.setText("AR supported");
-            Toast.makeText(this, "AR supported", Toast.LENGTH_SHORT).show();
+           // Toast.makeText(this, "AR supported", Toast.LENGTH_SHORT).show();
+            isARCoreSupportedAndUpToDate();
+
         } else { // The device is unsupported or unknown.
-            binding.statusText.setText("AR Not supported");
-            Toast.makeText(this, "AR Not supported", Toast.LENGTH_SHORT).show();
+         //   Toast.makeText(this, "AR Not supported", Toast.LENGTH_SHORT).show();
         }
     }
 
     public void createSession() {
         // Create a new ARCore session.
         try {
+
             mSession = new Session(this);
+            Config config = mSession.getConfig();
+            config.setGeospatialMode(Config.GeospatialMode.ENABLED);
+            mSession.configure(config);
         } catch (UnavailableArcoreNotInstalledException ex) {
-            throw new RuntimeException(ex);
+            Toast.makeText(this, ex.getMessage(), Toast.LENGTH_SHORT).show();
+          //  throw new RuntimeException(ex);
         } catch (UnavailableApkTooOldException ex) {
-            throw new RuntimeException(ex);
+            Toast.makeText(this, ex.getMessage(), Toast.LENGTH_SHORT).show();
+            //throw new RuntimeException(ex);
         } catch (UnavailableSdkTooOldException ex) {
-            throw new RuntimeException(ex);
+            Toast.makeText(this, ex.getMessage(), Toast.LENGTH_SHORT).show();
+          //  throw new RuntimeException(ex);
         } catch (UnavailableDeviceNotCompatibleException ex) {
-            throw new RuntimeException(ex);
+            Toast.makeText(this, ex.getMessage(), Toast.LENGTH_SHORT).show();
+          //  throw new RuntimeException(ex);
         }
 
         // Create a session config.
@@ -612,22 +755,27 @@ public class ARActivity extends AppCompatActivity implements Scene.OnUpdateListe
         ArCoreApk.Availability availability = ArCoreApk.getInstance().checkAvailability(this);
         switch (availability) {
             case SUPPORTED_INSTALLED:
+                createSession();
                 return true;
 
             case SUPPORTED_APK_TOO_OLD:
             case SUPPORTED_NOT_INSTALLED:
                 try {
                     // Request ARCore installation or update if needed.
-                    ArCoreApk.InstallStatus installStatus = ArCoreApk.getInstance().requestInstall(this, true);
+                    ArCoreApk.InstallStatus installStatus = ArCoreApk.getInstance().requestInstall(ARActivity.this, true);
                     switch (installStatus) {
                         case INSTALL_REQUESTED:
+                            ArCoreApk.InstallStatus installStatus_ = ArCoreApk.getInstance().requestInstall(ARActivity.this, true);
+                            Toast.makeText(this, "AR Core required installation", Toast.LENGTH_SHORT).show();
                             Log.i(TAG, "ARCore installation requested.");
                             return false;
                         case INSTALLED:
+                            createSession();
                             return true;
                     }
                 } catch (UnavailableException e) {
                     Log.e(TAG, "ARCore not installed", e);
+                    Toast.makeText(this, "Ar error:" +e.getMessage(), Toast.LENGTH_SHORT).show();
                 }
                 return false;
 
@@ -645,7 +793,6 @@ public class ARActivity extends AppCompatActivity implements Scene.OnUpdateListe
         }
         return false;
     }
-
 
 
 
@@ -688,6 +835,50 @@ public class ARActivity extends AppCompatActivity implements Scene.OnUpdateListe
                         return null;
                     }
                 });
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        if (!CameraPermissionHelper.hasCameraPermission(this)) {
+            CameraPermissionHelper.requestCameraPermission(this);
+            return;
+        }
+        try {
+            if (mSession == null) {
+                switch (ArCoreApk.getInstance().requestInstall(this, mUserRequestedInstall)) {
+                    case INSTALLED:
+                        // Success: Safe to create the AR session.
+                        mSession = new Session(this);
+                        break;
+                    case INSTALL_REQUESTED:
+                        // When this method returns `INSTALL_REQUESTED`:
+                        // 1. ARCore pauses this activity.
+                        // 2. ARCore prompts the user to install or update Google Play
+                        //    Services for AR (market://details?id=com.google.ar.core).
+                        // 3. ARCore downloads the latest device profile data.
+                        // 4. ARCore resumes this activity. The next invocation of
+                        //    requestInstall() will either return `INSTALLED` or throw an
+                        //    exception if the installation or update did not succeed.
+                        mUserRequestedInstall = false;
+                        return;
+                }
+            }
+        } catch (UnavailableUserDeclinedInstallationException e) {
+            // Display an appropriate message to the user and return gracefully.
+            Toast.makeText(this, "TODO: handle exception " + e, Toast.LENGTH_LONG)
+                    .show();
+            return;
+        } catch (UnavailableDeviceNotCompatibleException e) {
+            throw new RuntimeException(e);
+        } catch (UnavailableSdkTooOldException e) {
+            throw new RuntimeException(e);
+        } catch (UnavailableArcoreNotInstalledException e) {
+            throw new RuntimeException(e);
+        } catch (UnavailableApkTooOldException e) {
+            throw new RuntimeException(e);
+        }
+
     }
 
     private void placeModel(Anchor anchor, ModelRenderable modelRenderable) {

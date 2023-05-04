@@ -33,6 +33,8 @@ android {
 }
 
 dependencies {
+    implementation 'com.google.android.gms:play-services-location:21.0.1'
+    implementation 'com.google.android.gms:play-services-auth:20.5.0'
     implementation 'com.google.android.gms:play-services-maps:18.1.0'
     implementation 'de.javagl:obj:0.2.1'
     implementation 'com.google.ar:core:1.36.0'
