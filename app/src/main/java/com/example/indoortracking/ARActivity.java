@@ -109,6 +109,7 @@ public class ARActivity extends AppCompatActivity implements Scene.OnUpdateListe
     private ActivityAractivityBinding binding;
     // To store the building information after we retrieve it
     private BuildingInfo buildingInfo_;
+    private String POIid;
     private Session mSession;
     private boolean mUserRequestedInstall = true;
     private boolean locationFound= false;
@@ -181,10 +182,12 @@ public class ARActivity extends AppCompatActivity implements Scene.OnUpdateListe
     private void fillbuildingData() {
         // get data from intent;
         Intent intent=getIntent();
-        Bundle bundle= intent.getBundleExtra("data");
+        Bundle bundle= intent.getBundleExtra("POIdata");
         buildingId= bundle.getString("buildingId");
         targetFloorId= bundle.getString("floorId");
-        targetCoordinate= new Coordinate(bundle.getDouble("coordinateX"), bundle.getDouble("coordinateY"));
+        POIid= bundle.getString("poiId");
+
+        targetCoordinate= new Coordinate(bundle.getDouble("PoicoordinateX"), bundle.getDouble("coordinateY"));
     }
 
     private void manageUI() {

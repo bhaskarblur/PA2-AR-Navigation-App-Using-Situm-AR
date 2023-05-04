@@ -6,13 +6,16 @@
     android:layout_height="match_parent"
     tools:context=".mapActivity">
 
-    <fragment xmlns:android="http://schemas.android.com/apk/res/android"
-        xmlns:tools="http://schemas.android.com/tools"
+    <fragment
         android:id="@+id/map"
         android:name="com.google.android.gms.maps.SupportMapFragment"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:visibility="gone"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent"
         tools:context=".MapsActivity" />
 
     <FrameLayout
@@ -51,8 +54,8 @@
         android:id="@+id/emr_layout"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:background="#E8E8E8"
-        android:visibility="invisible"
+        android:background="#F1F1F1"
+        android:visibility="gone"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="parent">
@@ -66,11 +69,11 @@
             android:layout_marginEnd="20dp"
             android:layout_marginBottom="14dp"
             android:fontFamily="@font/montregular"
+            android:lineHeight="27dp"
             android:text="There is a Fire emergency on Floor 2."
             android:textAlignment="center"
             android:textColor="@color/redPrimary"
             android:textSize="15sp"
-            android:lineHeight="27dp"
             app:layout_constraintBottom_toBottomOf="parent"
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintStart_toStartOf="parent"
