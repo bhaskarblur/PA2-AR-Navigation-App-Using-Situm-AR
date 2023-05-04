@@ -6,24 +6,43 @@
     android:layout_height="match_parent"
     tools:context=".mapActivity">
 
-    <es.situm.wayfinding.SitumMapView
-        android:layout_height="match_parent"
+    <fragment xmlns:android="http://schemas.android.com/apk/res/android"
+        xmlns:tools="http://schemas.android.com/tools"
         android:layout_width="match_parent"
-        android:id="@+id/maps_library_target_"
-        app:situm_has_search_view="false"
+        android:layout_height="match_parent"
+        android:id="@+id/map"
         android:visibility="gone"
-        app:situm_enable_autostart_positioning="true">
+        tools:context=".MapsActivity"
+        android:name="com.google.android.gms.maps.SupportMapFragment" />
 
-    </es.situm.wayfinding.SitumMapView>
     <FrameLayout
         android:id="@+id/maps_library_target"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent"
+        app:situm_enable_autostart_positioning="true"
         app:situm_has_search_view="false"
-        app:situm_user_position_icon="situm_position_icon.png"
         app:situm_user_position_arrow_icon="situm_position_icon_arrow.png"
-        app:situm_enable_autostart_positioning="true">
+        app:situm_user_position_icon="situm_position_icon.png">
 
     </FrameLayout>
+
+    <RelativeLayout
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_alignParentBottom="true"
+        android:layout_marginStart="20dp"
+        android:layout_marginBottom="20dp"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintStart_toStartOf="parent">
+
+        <com.example.indoortracking.common.floorselector.FloorSelectorView
+            android:id="@+id/situm_floor_selector"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content" />
+    </RelativeLayout>
 
 </androidx.constraintlayout.widget.ConstraintLayout>

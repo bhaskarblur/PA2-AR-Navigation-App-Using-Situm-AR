@@ -1,20 +1,18 @@
 package com.example.indoortracking;
 
-import static android.content.ContentValues.TAG;
-
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
-import androidx.core.app.ActivityCompat;
 
 import android.content.Intent;
 import android.content.IntentSender;
-import android.location.Location;
-import android.location.LocationListener;
-import android.location.LocationRequest;
+import android.graphics.Bitmap;
 import android.os.Bundle;
 import android.os.Handler;
+import android.util.Log;
+import android.widget.ProgressBar;
 import android.widget.Toast;
 
+import com.example.indoortracking.common.floorselector.FloorSelectorView;
 import com.example.indoortracking.databinding.ActivityAractivityBinding;
 import com.google.android.gms.common.api.ApiException;
 import com.google.android.gms.common.api.ResolvableApiException;
@@ -26,49 +24,57 @@ import com.google.android.gms.maps.CameraUpdateFactory;
 import com.google.android.gms.maps.GoogleMap;
 import com.google.android.gms.maps.OnMapReadyCallback;
 import com.google.android.gms.maps.SupportMapFragment;
+import com.google.android.gms.maps.model.BitmapDescriptorFactory;
+import com.google.android.gms.maps.model.Circle;
+import com.google.android.gms.maps.model.CircleOptions;
 import com.google.android.gms.maps.model.LatLng;
+import com.google.android.gms.maps.model.LatLngBounds;
+import com.google.android.gms.maps.model.MapStyleOptions;
 import com.google.android.gms.maps.model.MarkerOptions;
 import com.google.android.gms.tasks.OnCompleteListener;
 import com.google.android.gms.tasks.Task;
 
 import java.util.Collection;
-import java.util.List;
 
-import es.situm.maps.library.domain.interceptor.Interceptor;
 import es.situm.sdk.SitumSdk;
-import es.situm.sdk.directions.DirectionsRequest;
 import es.situm.sdk.error.Error;
+import es.situm.sdk.location.LocationListener;
+import es.situm.sdk.location.LocationManager;
+import es.situm.sdk.location.LocationRequest;
+import es.situm.sdk.location.LocationStatus;
 import es.situm.sdk.model.cartography.Building;
 import es.situm.sdk.model.cartography.BuildingInfo;
 import es.situm.sdk.model.cartography.Floor;
 import es.situm.sdk.model.cartography.Poi;
 import es.situm.sdk.model.location.Coordinate;
+import es.situm.sdk.model.location.Location;
 import es.situm.wayfinding.LibrarySettings;
-import es.situm.wayfinding.OnLoadBuildingsListener;
 import es.situm.wayfinding.OnPoiSelectionListener;
-import es.situm.wayfinding.SitumMap;
 import es.situm.wayfinding.SitumMapView;
 import es.situm.wayfinding.SitumMapsLibrary;
-import es.situm.wayfinding.navigation.Navigation;
-import es.situm.wayfinding.navigation.NavigationError;
-import es.situm.wayfinding.navigation.OnNavigationListener;
 
-public class mapActivity extends AppCompatActivity {
+public class mapActivity extends AppCompatActivity implements OnMapReadyCallback {
     private SitumMapsLibrary mapsLibrary = null;
     private LibrarySettings librarySettings;
     private SitumMapView mapsView=null;
     private String buildingId = "13347";
     private String targetFloorId = "42059";
     private Boolean routesFound=false;
+    private LocationManager locationManager;
     private Coordinate targetCoordinate =
             new Coordinate(30.919247, 75.831841);
     private commons commons;
     private boolean isNavigating = false;
     private boolean arrived=false;
-
+    private GoogleMap googleMap;
+    private LocationListener locationListener;
     private ActivityAractivityBinding binding;
+    private Circle circle;
     // To store the building information after we retrieve it
     private BuildingInfo buildingInfo_;
+    private GetPoisUseCase getPoisUseCase;
+    private GetPoiCategoryIconUseCase getPoiCategoryIconUseCase = new GetPoiCategoryIconUseCase();
+    private ProgressBar progressBar;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -76,15 +82,22 @@ public class mapActivity extends AppCompatActivity {
         setContentView(R.layout.activity_map);
         commons = new commons();
         enableLoc();
-        loadMap();
-        manageLogic();
+        SitumSdk.init(mapActivity.this);
+      //  loadMap();
+        load_map2();
+    }
 
+    private void load_map2() {
+        SupportMapFragment mapFragment = (SupportMapFragment) getSupportFragmentManager()
+                .findFragmentById(R.id.map);
+        mapFragment.getMapAsync(this);
+        locationManager=SitumSdk.locationManager();
     }
 
     private void loadMap() {
-        SitumSdk.init(mapActivity.this);
+        locationManager=SitumSdk.locationManager();
         librarySettings = new LibrarySettings();
-
+        librarySettings.setMinZoom(25);
         librarySettings.setHasSearchView(false);
         librarySettings.setApiKey(commons.getAPI_EMAIL(), commons.getAPI_KEY());
         librarySettings.setUserPositionIcon("situm_position_icon.png");
@@ -92,46 +105,15 @@ public class mapActivity extends AppCompatActivity {
         mapsLibrary = new SitumMapsLibrary(R.id.maps_library_target, this, librarySettings);
         mapsLibrary.load();
 
+
+
         new Handler().postDelayed(new Runnable() {
             @Override
             public void run() {
-                librarySettings.setMinZoom(25);
-                mapsLibrary.setOnLoadBuildingsListener(new OnLoadBuildingsListener() {
-                    @Override
-                    public void onBuildingLoaded(Building building) {
-
-                    }
-
-                    @Override
-                    public void onBuildingsLoaded(List<Building> list) {
-
-                    }
-
-                    @Override
-                    public void onFloorImageLoaded(Building building, Floor floor) {
-                        mapsLibrary.enableOneBuildingMode(buildingId);
-                        mapsLibrary.startPositioning(building.getIdentifier());
-                        librarySettings.setShowNavigationIndications(true);
-                        SitumSdk.communicationManager()
-                                .fetchIndoorPOIsFromBuilding(building.getIdentifier(), new es.situm.sdk.utils.Handler<Collection<Poi>>() {
-                                    @Override
-                                    public void onSuccess(Collection<Poi> pois) {
-                                        if(!routesFound) {
-                                            for (Poi poi : pois) {
-                                                  mapsLibrary.findRouteToPoi(poi);
-                                            }
-                                            routesFound = true;
-                                        }
-                                    }
-
-                                    @Override
-                                    public void onFailure(Error error) {
-                                        Toast.makeText(mapActivity.this,
-                                                "Error fetching building data.", Toast.LENGTH_SHORT).show();
-                                    }
-                                });
-                    }
-                });
+                mapsLibrary.enableOneBuildingMode(buildingId);
+                mapsLibrary.startPositioning(buildingId);
+                startLocation();
+                librarySettings.setShowNavigationIndications(true);
             }
         },500);
 
@@ -152,8 +134,105 @@ public class mapActivity extends AppCompatActivity {
     }
 
 
-    private void manageLogic() {
+    private void startLocation() {
+        if (locationManager.isRunning()) {
+            return;
+        }
+        locationListener = new LocationListener(){
 
+            @Override
+            public void onLocationChanged(@NonNull Location location) {
+                LatLng latLng = new LatLng(location.getCoordinate().getLatitude(),
+                        location.getCoordinate().getLongitude());
+                if (circle == null) {
+                    circle = googleMap.addCircle(new CircleOptions()
+                            .center(latLng)
+                            .radius(.9f)
+                            .strokeWidth(6f)
+                                    .zIndex(9)
+                                    .strokeColor(getResources().getColor(R.color.white))
+                            .fillColor(getResources().getColor(R.color.redPrimary)));
+
+                }else{
+                    circle.setCenter(latLng);
+                }
+                googleMap.animateCamera(CameraUpdateFactory.newLatLngZoom(latLng, 25));
+            }
+
+
+            @Override
+            public void onStatusChanged(@NonNull LocationStatus locationStatus) {
+            }
+
+            @Override
+            public void onError(@NonNull Error error) {
+            }
+        };
+        LocationRequest locationRequest = new LocationRequest.Builder()
+                .useWifi(true)
+                .useBle(true)
+                .useForegroundService(true)
+                .build();
+        locationManager.requestLocationUpdates(locationRequest, locationListener);
+
+    }
+    private void stopLocation() {
+        if (!locationManager.isRunning()) {
+            return;
+        }
+        locationManager.removeUpdates(locationListener);
+    }
+
+
+    private void getPois(final GoogleMap googleMap){
+        getPoisUseCase.get(new GetPoisUseCase.Callback() {
+            @Override
+            public void onSuccess(Building building, Collection<Poi> pois) {
+                if (pois.isEmpty()){
+                    Toast.makeText(mapActivity.this, "There isnt any poi in the building: " + building.getName() + ". Go to the situm dashboard and create at least one poi before execute again this example", Toast.LENGTH_LONG).show();
+                }else {
+                    for (final Poi poi : pois) {
+                        getPoiCategoryIconUseCase.getUnselectedIcon(poi, new GetPoiCategoryIconUseCase.Callback() {
+                            @Override
+                            public void onSuccess(Bitmap bitmap) {
+                                drawPoi(poi, bitmap);
+                            }
+
+                            @Override
+                            public void onError(String error) {
+                                Log.d("Error fetching poi icon", error);
+                                drawPoi(poi);
+                            }
+                        });
+                    }
+
+                }
+            }
+
+            private void drawPoi(Poi poi, Bitmap bitmap) {
+                LatLngBounds.Builder builder = new LatLngBounds.Builder();
+                LatLng latLng = new LatLng(poi.getCoordinate().getLatitude(),
+                        poi.getCoordinate().getLongitude());
+                MarkerOptions markerOptions = new MarkerOptions()
+                        .position(latLng)
+                        .title(poi.getName());
+                if (bitmap != null) {
+                    markerOptions.icon(BitmapDescriptorFactory.fromBitmap(bitmap));
+                }
+                googleMap.addMarker(markerOptions);
+                builder.include(latLng);
+                googleMap.animateCamera(CameraUpdateFactory.newLatLngBounds(builder.build(), 100));
+            }
+
+            private void drawPoi(Poi poi) {
+                drawPoi(poi, null);
+            }
+
+            @Override
+            public void onError(String error) {
+                Toast.makeText(mapActivity.this, error, Toast.LENGTH_LONG).show();
+            }
+        });
     }
 
     private void enableLoc() {
@@ -228,6 +307,43 @@ public class mapActivity extends AppCompatActivity {
             }
         }
         super.onBackPressed();
+    }
+
+    @Override
+    public void onMapReady(@NonNull GoogleMap googleMap) {
+        this.googleMap = googleMap;
+        googleMap.getUiSettings().setMapToolbarEnabled(false);
+        googleMap.getUiSettings().setMyLocationButtonEnabled(false);
+        googleMap.setBuildingsEnabled(false);
+        googleMap.setMapStyle(
+                MapStyleOptions.loadRawResourceStyle(
+                        this, R.raw.google_map_style));
+        startLocation();
+        SitumSdk.communicationManager().fetchBuildingInfo(buildingId, new es.situm.sdk.utils.Handler<BuildingInfo>() {
+            @Override
+            public void onSuccess(BuildingInfo buildingInfo) {
+                buildingInfo_=buildingInfo;
+               FloorSelectorView floorSelectorView = findViewById(R.id.situm_floor_selector);
+                floorSelectorView.setFloorSelector(buildingInfo.getBuilding(), googleMap);
+                getPoisUseCase= new GetPoisUseCase(buildingInfo.getBuilding());
+                getPois(googleMap);
+            }
+
+            @Override
+            public void onFailure(Error error) {
+
+            }
+        });
+
+
+
+    }
+
+    @Override
+    public void finish() {
+        getPoisUseCase.cancel();
+        locationManager.removeUpdates(locationListener);
+        super.finish();
     }
 }
 
