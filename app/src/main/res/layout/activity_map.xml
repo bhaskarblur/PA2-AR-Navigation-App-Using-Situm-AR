@@ -107,13 +107,12 @@
             android:layout_width="28dp"
             android:layout_height="28dp"
             android:layout_marginEnd="20dp"
-            android:layout_marginBottom="20dp"
             android:background="@drawable/buttonbg2"
             android:scaleType="fitCenter"
             app:layout_constraintBottom_toBottomOf="parent"
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintTop_toTopOf="parent"
-            app:layout_constraintVertical_bias="0.5"
+            app:layout_constraintVertical_bias="0.100000024"
             app:srcCompat="@drawable/situm_ic_notification" />
 
         <androidx.constraintlayout.widget.ConstraintLayout

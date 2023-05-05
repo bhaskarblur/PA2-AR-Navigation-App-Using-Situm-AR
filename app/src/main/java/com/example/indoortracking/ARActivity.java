@@ -15,41 +15,34 @@ import es.situm.sdk.model.cartography.Floor;
 import es.situm.sdk.model.cartography.Poi;
 import es.situm.sdk.model.cartography.Point;
 import es.situm.sdk.model.directions.Route;
+import es.situm.sdk.model.directions.RouteSegment;
 import es.situm.sdk.model.location.Coordinate;
 import es.situm.sdk.model.location.Location;
 import es.situm.sdk.location.LocationListener;
 import es.situm.sdk.location.LocationRequest;
 
 import android.Manifest;
+import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
-import android.content.IntentSender;
 import android.content.pm.PackageManager;
 import android.content.pm.ResolveInfo;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 
+import android.location.LocationManager;
 import android.media.AudioManager;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.speech.tts.TextToSpeech;
-import android.speech.tts.Voice;
 import android.util.Log;
 import android.view.MotionEvent;
 import android.view.View;
 import android.widget.Toast;
 
+import com.example.indoortracking.assets.MainActivity;
 import com.example.indoortracking.databinding.ActivityAractivityBinding;
-import com.google.android.gms.common.api.ApiException;
-import com.google.android.gms.common.api.ResolvableApiException;
-import com.google.android.gms.location.LocationServices;
-import com.google.android.gms.location.LocationSettingsRequest;
-import com.google.android.gms.location.LocationSettingsResponse;
-import com.google.android.gms.location.LocationSettingsStatusCodes;
-import com.google.android.gms.maps.model.LatLng;
-import com.google.android.gms.tasks.OnCompleteListener;
-import com.google.android.gms.tasks.Task;
 import com.google.ar.core.Anchor;
 import com.google.ar.core.ArCoreApk;
 import com.google.ar.core.AugmentedImage;
@@ -61,7 +54,6 @@ import com.google.ar.core.FutureState;
 import com.google.ar.core.GeospatialPose;
 import com.google.ar.core.HitResult;
 import com.google.ar.core.Plane;
-import com.google.ar.core.Pose;
 import com.google.ar.core.Session;
 import com.google.ar.core.TrackingState;
 import com.google.ar.core.VpsAvailability;
@@ -88,15 +80,14 @@ import com.google.ar.sceneform.rendering.ModelRenderable;
 import com.google.ar.sceneform.rendering.ShapeFactory;
 import com.google.ar.sceneform.ux.ArFragment;
 import com.google.ar.sceneform.ux.BaseArFragment;
-import com.google.ar.sceneform.ux.TransformableNode;
-
-import org.w3c.dom.Text;
 
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
 import java.util.function.Consumer;
 import java.util.function.Function;
 
@@ -107,6 +98,8 @@ import es.situm.sdk.model.navigation.NavigationProgress;
 import es.situm.sdk.navigation.NavigationListener;
 import es.situm.sdk.navigation.NavigationRequest;
 import es.situm.sdk.utils.Handler;
+import uk.co.appoly.arcorelocation.LocationMarker;
+import uk.co.appoly.arcorelocation.LocationScene;
 
 public class ARActivity extends AppCompatActivity implements Scene.OnUpdateListener{
     // to be changed with intent data
@@ -130,10 +123,13 @@ public class ARActivity extends AppCompatActivity implements Scene.OnUpdateListe
     private AnchorNode anchorNode;
     private customARFrag customARFrag;
     private Node node;
+    private LocationScene locationScene;
     private int TTS_CHECK_CODE=111;
     private TextToSpeech tts;
     AnchorNode startNode;
     AnchorNode endNode;
+    ModelRenderable andyRenderable;
+    private AnchorNode lastAnchorNode= new AnchorNode();
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -141,10 +137,9 @@ public class ARActivity extends AppCompatActivity implements Scene.OnUpdateListe
         binding = ActivityAractivityBinding.inflate(getLayoutInflater());
         setContentView(binding.getRoot());
         SitumSdk.init(this);
-        manageUI();
         setupTTs();
-
         maybeEnableArButton();
+        manageUI();
        // fillbuildingData();
 
 
@@ -179,7 +174,7 @@ public class ARActivity extends AppCompatActivity implements Scene.OnUpdateListe
                 }
                   SitumSdk.locationManager().
                         requestLocationUpdates(locationRequest, locationListener);
-                  changeDirection("straight");
+                  //changeDirection("straight");
 
             }
 
@@ -193,6 +188,96 @@ public class ARActivity extends AppCompatActivity implements Scene.OnUpdateListe
         });
     }
 
+    private Node nodeForLine;
+
+
+    private void addLineBetweenHits(HitResult hitResult, Plane plane, MotionEvent motionEvent) {
+        Anchor anchor = hitResult.createAnchor();
+        AnchorNode anchorNode = new AnchorNode(anchor);
+
+        if (lastAnchorNode != null) {
+            anchorNode.setParent(arFragment.getArSceneView().getScene());
+            Vector3 point1, point2;
+            point1 = lastAnchorNode.getWorldPosition();
+            point2 = anchorNode.getWorldPosition();
+
+        /*
+            First, find the vector extending between the two points and define a look rotation
+            in terms of this Vector.
+        */
+            final Vector3 difference = Vector3.subtract(point1, point2);
+            final Vector3 directionFromTopToBottom = difference.normalized();
+            final Quaternion rotationFromAToB =
+                    Quaternion.lookRotation(directionFromTopToBottom, Vector3.up());
+            MaterialFactory.makeOpaqueWithColor(getApplicationContext(), new Color(0, 255, 244))
+                    .thenAccept(
+                            material -> {
+/* Then, create a rectangular prism, using ShapeFactory.makeCube() and use the difference vector
+       to extend to the necessary length.  */
+                                ModelRenderable model = ShapeFactory.makeCube(
+                                        new Vector3(.08f, .008f, difference.length()),
+                                        Vector3.zero(), material);
+/* Last, set the world rotation of the node to the rotation calculated earlier and set the world position to
+       the midpoint between the given points . */
+                                Node node = new Node();
+                                node.setParent(anchorNode);
+                                node.setRenderable(model);
+                                node.setWorldPosition(Vector3.add(point1, point2).scaled(.5f));
+                                node.setWorldRotation(rotationFromAToB);
+                            }
+                    );
+            lastAnchorNode = anchorNode;
+        }
+    }
+        private void drawLine (AnchorNode node1, AnchorNode node2, Point p1, Point p2){
+            //Draw a line between two AnchorNodes (adapted from https://stackoverflow.com/a/52816504/334402)
+            Log.d(TAG, "drawLine");
+            Vector3 point1, point2;
+            point1 = node1.getWorldPosition();
+            point2 = node2.getWorldPosition();
+
+
+            //First, find the vector extending between the two points and define a look rotation
+            //in terms of this Vector.
+            final Vector3 difference = Vector3.subtract(point1, point2);
+            final Vector3 directionFromTopToBottom = difference.normalized();
+            final Quaternion rotationFromAToB =
+                    Quaternion.lookRotation(directionFromTopToBottom, Vector3.up());
+            MaterialFactory.makeOpaqueWithColor(getApplicationContext(), new Color(0, 255, 244))
+                    .thenAccept(
+                            material -> {
+                            /* Then, create a rectangular prism, using ShapeFactory.makeCube() and use the difference vector
+                                   to extend to the necessary length.  */
+                                Log.d(TAG, "drawLine inside .thenAccept");
+                                ModelRenderable model = ShapeFactory.makeCube(
+                                        new Vector3(.5f, .1f, difference.length()),
+                                        Vector3.zero(), material);
+                            /* Last, set the world rotation of the node to the rotation calculated earlier and set the world position to
+                                   the midpoint between the given points . */
+                                Anchor lineAnchor = node2.getAnchor();
+                                nodeForLine = new Node();
+                                nodeForLine.setParent(node1);
+                                nodeForLine.setRenderable(model);
+                                nodeForLine.setWorldPosition(Vector3.add(point1, point2).scaled(.5f));
+                                nodeForLine.setWorldRotation(rotationFromAToB);
+                                arFragment.getArSceneView().getScene().addChild(nodeForLine);
+                            }
+                    );
+
+        }
+
+
+    private Node getAndy() {
+        Node base = new Node();
+        base.setRenderable(andyRenderable);
+        Context c = this;
+        base.setOnTapListener((v, event) -> {
+            Toast.makeText(
+                            c, "Andy touched.", Toast.LENGTH_LONG)
+                    .show();
+        });
+        return base;
+    }
     private void setupTTs() {
         PackageManager pm = getPackageManager();
         Intent installIntent = new Intent();
@@ -203,7 +288,7 @@ public class ARActivity extends AppCompatActivity implements Scene.OnUpdateListe
             Toast.makeText(this, "Voice commands not supported!", Toast.LENGTH_SHORT).show();
             // Not able to find the activity which should be started for this intent
         } else {
-            startActivityForResult(installIntent, TTS_CHECK_CODE);
+            //startActivityForResult(installIntent, TTS_CHECK_CODE);
         }
 
         tts= new TextToSpeech(this, new TextToSpeech.OnInitListener() {
@@ -257,8 +342,10 @@ public class ARActivity extends AppCompatActivity implements Scene.OnUpdateListe
         }
     }
 
+    private Anchor sampleAnchor;
     private void manageUI() {
         arFragment= (ArFragment) getSupportFragmentManager().findFragmentById(R.id.arFragment);
+        arFragment.getArSceneView().setupSession(mSession);
         binding.close.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
@@ -267,92 +354,16 @@ public class ARActivity extends AppCompatActivity implements Scene.OnUpdateListe
             }
         });
 
+        final boolean[] anchordone = {false};
+
+        arFragment.setOnTapArPlaneListener(
+                (HitResult hitResult, Plane plane, MotionEvent motionEvent) -> {
+                    addLineBetweenHits(hitResult, plane, motionEvent);
+                });
+
 
     }
 
-    private void setPOIModel() {
-        Earth earth = mSession.getEarth();
-        VpsAvailabilityFuture future = mSession.checkVpsAvailabilityAsync(targetCoordinate.getLatitude(), targetCoordinate.getLongitude(), new Consumer<VpsAvailability>() {
-            @Override
-            public void accept(VpsAvailability vpsAvailability) {
-
-            }
-        });
-
-// Poll VpsAvailabilityFuture later, for example, in a render loop.
-        if (future.getState() == FutureState.DONE) {
-            switch (future.getResult()) {
-                case AVAILABLE:
-                    // VPS is available at this location.
-
-                    if (earth != null && earth.getTrackingState() == TrackingState.TRACKING) {
-                        GeospatialPose cameraGeospatialPose = earth.getCameraGeospatialPose();
-                        if (earth.getTrackingState() == TrackingState.TRACKING) {
-                           Anchor terrainAnchor =
-                                    earth.resolveAnchorOnTerrain(
-                                            /* Locational values */
-                                            targetCoordinate.getLatitude(),
-                                            targetCoordinate.getLongitude(),
-                                            2f,
-                                            /* Rotational pose values */
-                                            1,
-                                            1,
-                                            1,
-                                            1);
-
-                            switch (terrainAnchor.getTerrainAnchorState()) {
-                                case SUCCESS:
-                                    if (terrainAnchor.getTrackingState() == TrackingState.TRACKING) {
-                                        //renderAnchoredContent(terrainAnchor);
-                                        earth.createAnchor( targetCoordinate.getLatitude(),
-                                                targetCoordinate.getLongitude(),
-                                                2f,
-                                                /* Rotational pose values */
-                                                1,
-                                                1,
-                                                1,
-                                                1);
-
-                                    }
-                                    break;
-                                case TASK_IN_PROGRESS:
-                                    // ARCore is contacting the ARCore API to resolve the Terrain anchor's pose.
-                                    // Display some waiting UI.
-                                    break;
-                                case ERROR_UNSUPPORTED_LOCATION:
-                                    // The requested anchor is in a location that isn't supported by the Geospatial API.
-                                    break;
-                                case ERROR_NOT_AUTHORIZED:
-                                    // An error occurred while authorizing your app with the ARCore API. See
-                                    // https://developers.google.com/ar/reference/java/com/google/ar/core/Anchor.TerrainAnchorState#error_not_authorized
-                                    // for troubleshooting steps.
-                                    break;
-                                case ERROR_INTERNAL:
-                                    // The Terrain anchor could not be resolved due to an internal error.
-                                    break;
-                                case NONE:
-                                    // This Anchor isn't a Terrain anchor or it became invalid because the Geospatial Mode was
-                                    // disabled.
-                                    break;
-                            }
-                            // This anchor can't be used immediately; check its TrackingState
-                            // and TerrainAnchorState before rendering content on this anchor.
-                        }
-                        // cameraGeospatialPose contains geodetic location, rotation, and confidences values.
-                    }
-                    break;
-                case UNAVAILABLE:
-                    // VPS is unavailable at this location.
-                    break;
-                case ERROR_NETWORK_CONNECTION:
-                    // The external service could not be reached due to a network connection error.
-                    break;
-
-                // Handle other error states, e.g. ERROR_RESOURCE_EXHAUSTED, ERROR_INTERNAL, ...
-            }
-        }
-        
-    }
 
     public void setupImage(Config config, Session session) {
         Bitmap image= BitmapFactory.decodeResource(getResources(),R.drawable.arrow);
@@ -462,7 +473,6 @@ public class ARActivity extends AppCompatActivity implements Scene.OnUpdateListe
 
         @Override
         public void onLocationChanged(@NonNull Location location) {
-            Toast.makeText(ARActivity.this, "Hello2", Toast.LENGTH_SHORT).show();
             Log.i(TAG, "Updating User navigation with: location = [" + location + "]");
             if (isNavigating) {
                 SitumSdk.navigationManager().updateWithLocation(location);
@@ -547,7 +557,6 @@ public class ARActivity extends AppCompatActivity implements Scene.OnUpdateListe
                     speakTTs("Finding shortest route to your destination.");
                     routeFound=true;
                 }
-                changeDirection("straight");
                 SitumSdk.navigationManager().requestNavigationUpdates(navigationRequest, navigationListener);
 
             }
@@ -583,22 +592,26 @@ public class ARActivity extends AppCompatActivity implements Scene.OnUpdateListe
                     @Override
                     public void onClick(DialogInterface dialogInterface, int i) {
                       //  startActivity(new Intent(ARActivity.this, mapActivity.class));
-                      //  finish();
-                       // overridePendingTransition(R.anim.slide_in_right, R.anim.slide_out_right);
+                        finish();
+                        overridePendingTransition(R.anim.slide_in_right, R.anim.slide_out_right);
+
 
                     }
                 });
                 builder.setTitle("Destination Reached!");
                 builder.setMessage("You've arrived at your destination, press OK to exit.").show();
                 SitumSdk.navigationManager().removeUpdates();
-                arrived=true;
                 speakTTs("Destination Reached!");
+                arrived=true;
+
+
 
             }
         }
 
         @Override
         public void onProgress(NavigationProgress navigationProgress) {
+            //Toast.makeText(ARActivity.this, "Route advances", Toast.LENGTH_SHORT).show();
             Log.i(TAG, "Route advances");
             //binding.arrow2d.setVisibility(View.VISIBLE);
             binding.statusText.setText("Follow the route.");
@@ -617,29 +630,35 @@ public class ARActivity extends AppCompatActivity implements Scene.OnUpdateListe
             if(navigationProgress.getCurrentIndication().toString().toLowerCase().contains("left")) {
                 binding.arrow2d.setRotation(-90f);
                 isModelPlaced=false;
-               changeDirection("left");
+               //changeDirection("left");
 
             }
             else if(navigationProgress.getCurrentIndication().toString().toLowerCase().contains("straight")) {
                 isModelPlaced=false;
-                changeDirection("straight");
+               // changeDirection("straight");
                 binding.arrow2d.setRotation(0f);
             }
             else if(navigationProgress.getCurrentIndication().toString().toLowerCase().contains("backward")) {
                 binding.indicatorText.setText("");
                 isModelPlaced=false;
-                changeDirection("back");
+                //changeDirection("back");
                 binding.indicatorText.setText("Take a U-turn");
                 binding.arrow2d.setRotation(180f);
             }
             else if(navigationProgress.getCurrentIndication().toString().toLowerCase().contains("right")){
                 binding.arrow2d.setRotation(90f);
                 isModelPlaced=false;
-                changeDirection("right");
+               // changeDirection("right");
             }
-
             binding.indicatorText.setText(navigationProgress.getCurrentIndication().toText(ARActivity.this));
-            speakTTs(navigationProgress.getCurrentIndication().toText(ARActivity.this).toString());
+            new android.os.Handler().postDelayed(new Runnable() {
+                @Override
+                public void run() {
+
+                    //speakTTs(navigationProgress.getCurrentIndication().toText(ARActivity.this).toString());
+                }
+            },6000);
+
 
 
 //            Log.i(TAG, "Current indication " + navigationProgress.getCurrentIndication().toText(ARActivity.this));
@@ -650,14 +669,15 @@ public class ARActivity extends AppCompatActivity implements Scene.OnUpdateListe
 //            Log.i(TAG, " Closest location in route: " + navigationProgress.getClosestLocationInRoute());
 //            Log.i(TAG, " Distance to closest location in route: " + navigationProgress.getDistanceToClosestPointInRoute());
 //            Log.i(TAG, " Remaining segments: ");
-//            for (RouteSegment segment : navigationProgress.getSegments()) {
-//                Log.i(TAG, "   Floor Id: " + segment.getFloorIdentifier());
-//                for (Point point : segment.getPoints()) {
-//                    Log.i(TAG, "    Point: BuildingId " + point.getFloorIdentifier() + " FloorId " + point.getFloorIdentifier() + " Latitude " + point.getCoordinate().getLatitude() + " Longitude " + point.getCoordinate().getLongitude());
-//                }
-//                Log.i(TAG, "    ----");
-//            }
-//            Log.i(TAG, "--------");
+            for (RouteSegment segment : navigationProgress.getSegments()) {
+                Log.i(TAG, "   Floor Id: " + segment.getFloorIdentifier());
+                for (Point point : segment.getPoints()) {
+
+                    Log.i(TAG, "    Point: BuildingId " + point.getFloorIdentifier() + " FloorId " + point.getFloorIdentifier() + " Latitude " + point.getCoordinate().getLatitude() + " Longitude " + point.getCoordinate().getLongitude());
+                }
+                Log.i(TAG, "    ----");
+            }
+            Log.i(TAG, "--------");
 
         }
 
@@ -726,8 +746,57 @@ public class ARActivity extends AppCompatActivity implements Scene.OnUpdateListe
 
             mSession = new Session(this);
             Config config = mSession.getConfig();
+            config.setUpdateMode(Config.UpdateMode.LATEST_CAMERA_IMAGE);
             config.setGeospatialMode(Config.GeospatialMode.ENABLED);
             mSession.configure(config);
+            VpsAvailabilityFuture future = mSession.checkVpsAvailabilityAsync(targetCoordinate
+                    .getLatitude(), targetCoordinate.getLongitude(), new Consumer<VpsAvailability>() {
+                @Override
+                public void accept(VpsAvailability vpsAvailability) {
+                  //  Toast.makeText(ARActivity.this, String.valueOf(vpsAvailability.toString()), Toast.LENGTH_SHORT).show();
+                }
+            });
+
+   ;
+            if (future.getState() == FutureState.DONE) {
+                Toast.makeText(this, "Hi", Toast.LENGTH_SHORT).show();
+                switch (future.getResult()) {
+                    case AVAILABLE:
+                        Earth earth= mSession.getEarth();
+                       // Toast.makeText(this, "hi", Toast.LENGTH_SHORT).show();
+                    //    Toast.makeText(this, earth.getTrackingState().toString(), Toast.LENGTH_SHORT).show();
+                        if (earth != null && earth.getTrackingState() == TrackingState.TRACKING) {
+                            GeospatialPose cameraGeospatialPose = earth.getCameraGeospatialPose();
+                            Anchor anchor =
+                                    earth.createAnchor(
+                                            /* Locational values */
+                                            targetCoordinate.getLatitude(),
+                                            targetCoordinate.getLongitude(),
+                                            -.3,
+                                            /* Rotational pose values */
+                                            1f,
+                                            1f,
+                                            1f,
+                                            1f);
+                            sampleAnchor=anchor;
+                            Toast.makeText(this, "Tracking!", Toast.LENGTH_SHORT).show();
+                        }
+
+                        break;
+                    case UNAVAILABLE:
+                        Toast.makeText(this, "No Vps available here!", Toast.LENGTH_SHORT).show();
+                        // VPS is unavailable at this location.
+                        break;
+                    case ERROR_NETWORK_CONNECTION:
+                  //      Toast.makeText(this, "hi2", Toast.LENGTH_SHORT).show();
+                        // The external service could not be reached due to a network connection error.
+                        break;
+                    case ERROR_NOT_AUTHORIZED:
+                       // Toast.makeText(this, "Not Authorized", Toast.LENGTH_SHORT).show();
+
+                    // Handle other error states, e.g. ERROR_RESOURCE_EXHAUSTED, ERROR_INTERNAL, ...
+                }
+            }
         } catch (UnavailableArcoreNotInstalledException ex) {
             Toast.makeText(this, ex.getMessage(), Toast.LENGTH_SHORT).show();
           //  throw new RuntimeException(ex);
@@ -743,13 +812,13 @@ public class ARActivity extends AppCompatActivity implements Scene.OnUpdateListe
         }
 
         // Create a session config.
-        Config config = new Config(mSession);
 
         // Do feature-specific operations here, such as enabling depth or turning on
         // support for Augmented Faces.
 
         // Configure the session.
-        mSession.configure(config);
+
+
     }
     private boolean isARCoreSupportedAndUpToDate() {
         ArCoreApk.Availability availability = ArCoreApk.getInstance().checkAvailability(this);

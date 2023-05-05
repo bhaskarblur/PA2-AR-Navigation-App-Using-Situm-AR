@@ -13,6 +13,8 @@ dependencyResolutionManagement {
         maven {
             url = "https://repo.situm.com/artifactory/libs-release-local"
         }
+        maven {
+            url 'https://jitpack.io' }
     }
 }
 rootProject.name = "IndoorTracking"
