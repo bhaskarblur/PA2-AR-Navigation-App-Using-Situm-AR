@@ -218,6 +218,12 @@ public class mapActivity extends AppCompatActivity implements OnMapReadyCallback
             }
         });
 
+        binding.recenter.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                poiplaced=false;
+            }
+        });
         googleMap.setOnMarkerClickListener(new GoogleMap.OnMarkerClickListener() {
             @Override
             public boolean onMarkerClick(@NonNull Marker marker) {
@@ -241,7 +247,7 @@ public class mapActivity extends AppCompatActivity implements OnMapReadyCallback
                                 targetCoordinate= coordinate;
                                 clearMap();
                                 showAllRoutes=false;
-                                Toast.makeText(mapActivity.this, "switched to single", Toast.LENGTH_SHORT).show();
+                               // Toast.makeText(mapActivity.this, "switched to single", Toast.LENGTH_SHORT).show();
                                 binding.buttonsLayout.setVisibility(View.VISIBLE);
                                 // Navigate the user now, use navigation start and listener.
                                 //calculateSingleRoute(current,coordinate,cartesianCoordinate);
@@ -361,8 +367,9 @@ public class mapActivity extends AppCompatActivity implements OnMapReadyCallback
                 builder.setMessage("You've arrived at your destination, press OK to exit.").show();
 
                 SitumSdk.navigationManager().removeUpdates();
-                locationManager.removeUpdates(locationListener);
-                clearMap();
+                //locationManager.removeUpdates(locationListener);
+                //clearMap();
+                poiplaced=false;
                 arrived=true;
 
             }
@@ -424,6 +431,7 @@ public class mapActivity extends AppCompatActivity implements OnMapReadyCallback
 
                 //current floor at which user is
                 //targetFloorId=location.getFloorIdentifier();
+
                 if(!poiplaced) {
                         SitumSdk.communicationManager().fetchBuildingInfo(buildingId, new es.situm.sdk.utils.Handler<BuildingInfo>() {
                             @Override
