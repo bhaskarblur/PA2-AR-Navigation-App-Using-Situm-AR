@@ -658,6 +658,7 @@ public class ARActivity extends AppCompatActivity implements Scene.OnUpdateListe
                         // Navigation will take place along this route
                                 route(route).
                         // ... stopping when we're closer than 4 meters to the destination
+                                // change this later
                                 distanceToGoalThreshold(4).
                         // ... or we're farther away than 10 meters from the route
                                 outsideRouteThreshold(5).
@@ -738,13 +739,15 @@ public class ARActivity extends AppCompatActivity implements Scene.OnUpdateListe
             Log.d("current indication", navigationProgress.getCurrentIndication().toString());
 
             if(String.valueOf(navigationProgress.getDistanceToClosestPointInRoute()).toString().length()>3) {
-                binding.distanceleftText.setText(String.valueOf(navigationProgress.getDistanceToClosestPointInRoute())
+                binding.distanceleftText.setText(String.valueOf(navigationProgress.getDistanceToGoal())
                         .substring(0, 4) + "M");
             }
             else{
-                binding.distanceleftText.setText(String.valueOf(navigationProgress.getDistanceToClosestPointInRoute())
+                binding.distanceleftText.setText(String.valueOf(navigationProgress.getDistanceToGoal())
                         .substring(0, 3) + "M");
             }
+
+            binding.timeleftText.setText(String.valueOf(navigationProgress.getTimeToGoal()));
            // isModelPlaced=false;
             if(navigationProgress.getCurrentIndication().toString().toLowerCase().contains("left")) {
                 binding.arrow2d.setRotation(-90f);
@@ -758,10 +761,10 @@ public class ARActivity extends AppCompatActivity implements Scene.OnUpdateListe
                 binding.arrow2d.setRotation(0f);
             }
             else if(navigationProgress.getCurrentIndication().toString().toLowerCase().contains("backward")) {
-                binding.indicatorText.setText("");
+               // binding.indicatorText.setText("");
                 isModelPlaced=false;
                 //changeDirection("back");
-                binding.indicatorText.setText("Take a U-turn");
+              //  binding.indicatorText.setText("Take a U-turn");
                 binding.arrow2d.setRotation(180f);
             }
             else if(navigationProgress.getCurrentIndication().toString().toLowerCase().contains("right")){
@@ -769,7 +772,7 @@ public class ARActivity extends AppCompatActivity implements Scene.OnUpdateListe
                 isModelPlaced=false;
                // changeDirection("right");
             }
-            binding.indicatorText.setText(navigationProgress.getCurrentIndication().toText(ARActivity.this));
+            binding.indicText.setText(navigationProgress.getCurrentIndication().getIndicationType().toString());
             new android.os.Handler().postDelayed(new Runnable() {
                 @Override
                 public void run() {
