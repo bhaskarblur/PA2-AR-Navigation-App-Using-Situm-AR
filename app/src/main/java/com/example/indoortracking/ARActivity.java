@@ -86,6 +86,7 @@ import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.function.Consumer;
@@ -109,6 +110,7 @@ public class ARActivity extends AppCompatActivity implements Scene.OnUpdateListe
     private String buildingId = "13347";
     private String targetFloorId = "42059";
     private String arrow_uri="https://raw.githubusercontent.com/2wizstudio/indoorNav/main/arrow.gltf";
+    private String poi_uri="https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Models/master/1.0/SmilingFace/glTF/SmilingFace.gltf";
     private Coordinate targetCoordinate =
             new Coordinate(30.919247, 75.831841);
     private boolean isNavigating = false;
@@ -133,6 +135,8 @@ public class ARActivity extends AppCompatActivity implements Scene.OnUpdateListe
     AnchorNode endNode;
     ModelRenderable andyRenderable;
     private AnchorNode lastAnchorNode= new AnchorNode();
+
+    private boolean reachedPOI_= false;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -207,61 +211,141 @@ public class ARActivity extends AppCompatActivity implements Scene.OnUpdateListe
     }
     private void addLineBetweenHits_2(Point point, Pose pose) {
        // Anchor anchor = arFragment.getArSceneView().getSession().createAnchor(arFragment.getArSceneView().getArFrame().getCamera().getPose());
+        Frame frame= arFragment.getArSceneView().getArFrame();
+        Collection<Plane> plane= frame.getUpdatedTrackables(Plane.class);
+        for(Plane plane1:plane) {
+            if (plane1.getTrackingState() == TrackingState.TRACKING) {
+            }
+            Anchor anchor = arFragment.getArSceneView().getSession().createAnchor(pose);
+            AnchorNode anchorNode = new AnchorNode(anchor);
 
-        Anchor anchor = arFragment.getArSceneView().getSession().createAnchor(pose);
-        AnchorNode anchorNode = new AnchorNode(anchor);
-
-        if (lastAnchorNode != null) {
-            anchorNode.setParent(arFragment.getArSceneView().getScene());
-            Vector3 point1, point2;
-            point1 = lastAnchorNode.getWorldPosition();
-            point2 = anchorNode.getWorldPosition();
+            if (lastAnchorNode != null) {
+                anchorNode.setParent(arFragment.getArSceneView().getScene());
+                Vector3 point1, point2;
+                point1 = lastAnchorNode.getWorldPosition();
+                point2 = anchorNode.getWorldPosition();
 
         /*
             First, find the vector extending between the two points and define a look rotation
             in terms of this Vector.
         */
-            final Vector3 difference = Vector3.subtract(point1, point2);
-            final Vector3 directionFromTopToBottom = difference.normalized();
-            final Quaternion rotationFromAToB =
-                    Quaternion.lookRotation(directionFromTopToBottom, Vector3.up());
-            Texture.Sampler sampler = Texture.Sampler.builder()
-                    .setMinFilter(Texture.Sampler.MinFilter.LINEAR_MIPMAP_LINEAR)
-                    .setMagFilter(Texture.Sampler.MagFilter.LINEAR)
-                    // .setWrapModeR(Texture.Sampler.WrapMode.REPEAT)
-                    // .setWrapModeS(Texture.Sampler.WrapMode.REPEAT)
-                    // .setWrapModeT(Texture.Sampler.WrapMode.REPEAT)
-                    .build();
+                final Vector3 difference = Vector3.subtract(point1, point2);
+                final Vector3 directionFromTopToBottom = difference.normalized();
+                final Quaternion rotationFromAToB =
+                        Quaternion.lookRotation(directionFromTopToBottom, Vector3.up());
+                Texture.Sampler sampler = Texture.Sampler.builder()
+                        .setMinFilter(Texture.Sampler.MinFilter.LINEAR_MIPMAP_LINEAR)
+                        .setMagFilter(Texture.Sampler.MagFilter.LINEAR)
+                        // .setWrapModeR(Texture.Sampler.WrapMode.REPEAT)
+                        // .setWrapModeS(Texture.Sampler.WrapMode.REPEAT)
+                        // .setWrapModeT(Texture.Sampler.WrapMode.REPEAT)
+                        .build();
 
-            // 1. Make a texture
-            Texture.builder()
-                    .setSource(() ->    getApplicationContext().getAssets().open("arrow_texture.png"))
-                    .setSampler(sampler)
-                    .build().thenAccept(texture -> {
-                        MaterialFactory.makeTransparentWithTexture(getApplicationContext(),texture) //new Color(0, 255, 244))
-                                .thenAccept(
-                                        material -> {
+                // 1. Make a texture
+                Texture.builder()
+                        .setSource(() -> getApplicationContext().getAssets().open("arrow_texture.png"))
+                        .setSampler(sampler)
+                        .build().thenAccept(texture -> {
+                            MaterialFactory.makeTransparentWithTexture(getApplicationContext(), texture) //new Color(0, 255, 244))
+                                    .thenAccept(
+                                            material -> {
 /* Then, create a rectangular prism, using ShapeFactory.makeCube() and use the difference vector
        to extend to the necessary length.  */
-                                            ModelRenderable model = ShapeFactory.makeCube(
-                                                    new Vector3(.2f, .008f, difference.length()),
-                                                    Vector3.zero(), material);
+                                                ModelRenderable model = ShapeFactory.makeCube(
+                                                        new Vector3(.2f, .008f, difference.length()),
+                                                        Vector3.zero(), material);
 /* Last, set the world rotation of the node to the rotation calculated earlier and set the world position to
        the midpoint between the given points . */
-                                            Node node = new Node();
-                                            node.setParent(anchorNode);
-                                            node.setRenderable(model);
-                                            node.setWorldPosition(Vector3.add(point1, point2).scaled(.5f));
-                                            node.setWorldRotation(rotationFromAToB);
-                                        }
-                                );
-                    });
-            lastAnchorNode = anchorNode;
+                                                Node node = new Node();
+                                                node.setParent(anchorNode);
+                                                node.setRenderable(model);
+                                                node.setWorldPosition(Vector3.add(point1, point2).scaled(.5f));
+                                                node.setWorldRotation(rotationFromAToB);
+                                            }
+                                    );
+                        });
+                lastAnchorNode = anchorNode;
+            }
         }
     }
 
 
+    private void placePOI2() {
+        ModelRenderable.builder().
+                setSource(
+                        ARActivity.this,
+                        RenderableSource
+                                .builder()
+                                .setSource(ARActivity.this, Uri.parse(
+                                                poi_uri)
+                                        , RenderableSource.SourceType.GLTF2)
+                                .setScale(12.2f)
+                                .build())
+                .setRegistryId(poi_uri)
+                .build()
+                .thenAccept(modelRenderable -> addPOItoScene(null, modelRenderable, "straight"))
+                .exceptionally(throwable -> {
+                    //   Toast.makeText(ARActivity.this, "error:"+throwable.getCause(), Toast.LENGTH_SHORT).show();
+                    return null;
+                });
+    }
 
+    private void addPOItoScene(Anchor anchor, ModelRenderable modelRenderable, String rotate) {
+        //AnchorNode node= new AnchorNode(anchor);
+        List<Node> children = new ArrayList<>(arFragment.getArSceneView().getScene().getChildren());
+        node = new Node();
+        node.setParent(arFragment.getArSceneView().getScene());
+        node.setRenderable(modelRenderable);
+        arFragment.getArSceneView().getScene().addOnUpdateListener(new Scene.OnUpdateListener() {
+            @Override
+            public void onUpdate(FrameTime frameTime) {
+                if(reachedPOI_) {
+                    for (Node node_ : children) {
+                        if (node_ instanceof AnchorNode) {
+                            if (((AnchorNode) node_).getAnchor() != null) {
+                                ((AnchorNode) node_).getAnchor().detach();
+
+                            }
+                        }
+                        if (!(node_ instanceof Camera) && !(node_ instanceof Sun)) {
+                            node_.setParent(null);
+                        }
+                    }
+
+                    //  AnchorNode anchorNode1=new AnchorNode(anchor);
+                    //anchorNode1.setRenderable(modelRenderable);
+                    arFragment.getArSceneView().getScene().addChild(node);
+                    Camera camera = arFragment.getArSceneView().getScene().getCamera();
+                    Ray ray = camera.screenPointToRay(1080 / 2f, 2360 / 2f);
+                    Vector3 newpos = ray.getPoint(10f);
+                    node.setLocalPosition(newpos);
+                }
+                else {
+               //     Toast.makeText(ARActivity.this, "removed", Toast.LENGTH_SHORT).show();
+
+                    for (Node node_ : children) {
+                        if (node_ instanceof AnchorNode) {
+                            if (((AnchorNode) node_).getAnchor() != null) {
+                                node_.setParent(null);
+                                for(Anchor anchor1: Objects.requireNonNull(arFragment.getArSceneView().getSession()).getAllAnchors()) {
+                                    arFragment.getArSceneView().getSession().getAllAnchors().remove(anchor1);
+                                }
+                                ((AnchorNode) node_).getAnchor().detach();
+                                arFragment.getArSceneView().getScene().removeChild(node_);
+
+                            }
+                        }
+                        if (!(node_ instanceof Camera) && !(node_ instanceof Sun)) {
+                            node_.setParent(null);
+                        }
+                    }
+                }
+            }
+        });
+
+
+
+    }
     private void placePOI() {
         CompletableFuture<ModelRenderable> andy = ModelRenderable.builder()
                 .setSource(
@@ -280,6 +364,7 @@ public class ARActivity extends AppCompatActivity implements Scene.OnUpdateListe
                     return null;
                 });
 
+
         Toast.makeText(this, "first", Toast.LENGTH_SHORT).show();
         CompletableFuture.allOf(andy)
                 .handle(
@@ -292,6 +377,19 @@ public class ARActivity extends AppCompatActivity implements Scene.OnUpdateListe
 
                             try {
                                 andyRenderable = andy.get();
+                                ModelRenderable.builder().
+                                        setSource(
+                                                ARActivity.this,
+                                                RenderableSource
+                                                        .builder()
+                                                        .setSource(ARActivity.this, Uri.parse(
+                                                                        arrow_uri)
+                                                                , RenderableSource.SourceType.GLTF2)
+                                                        .setScale(2.2f)
+                                                        .build())
+                                        .setRegistryId(arrow_uri)
+                                        .build()
+                                        .thenAccept(modelRenderable -> andyRenderable = modelRenderable);
 
                             } catch (InterruptedException | ExecutionException ex) {
                                 Toast.makeText(this, "Unable to load renderables", Toast.LENGTH_SHORT).show();
@@ -306,6 +404,7 @@ public class ARActivity extends AppCompatActivity implements Scene.OnUpdateListe
 
                             if (locationScene == null) {
                                 Node base = new Node();
+                                base.setParent(arFragment.getArSceneView().getScene());
                                 base.setRenderable(andyRenderable);
                                 locationScene = new LocationScene(this,
                                         arFragment.getArSceneView());
@@ -513,8 +612,22 @@ public class ARActivity extends AppCompatActivity implements Scene.OnUpdateListe
             }
         });
 
-        final boolean[] anchordone = {false};
 
+        binding.statusText.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                if(!reachedPOI_) {
+                    reachedPOI_=true;
+                   // Toast.makeText(ARActivity.this, "added", Toast.LENGTH_SHORT).show();
+                }
+                else {
+                    reachedPOI_=false;
+                  //  Toast.makeText(ARActivity.this, "removed", Toast.LENGTH_SHORT).show();
+                }
+            }
+        });
+        final boolean[] anchordone = {false};
+        placePOI2();
         arFragment.setOnTapArPlaneListener(
                 (HitResult hitResult, Plane plane, MotionEvent motionEvent) -> {
                     //setModelPlaced();
@@ -525,12 +638,6 @@ public class ARActivity extends AppCompatActivity implements Scene.OnUpdateListe
     }
 
 
-    public void setupImage(Config config, Session session) {
-        Bitmap image= BitmapFactory.decodeResource(getResources(),R.drawable.arrow);
-        AugmentedImageDatabase database= new AugmentedImageDatabase(session);
-        database.addImage("arrow",image);
-        config.setAugmentedImageDatabase(database);
-    }
 
     private void changeDirection(String rotate) {
 
@@ -584,8 +691,8 @@ public class ARActivity extends AppCompatActivity implements Scene.OnUpdateListe
             public void onUpdate(FrameTime frameTime) {
                 Camera camera=arFragment.getArSceneView().getScene().getCamera();
                 Ray ray= camera.screenPointToRay(1580/2f, 1700);
-                Vector3 newpos= ray.getPoint(2f);
-                node.setLocalPosition(newpos);
+              //  Vector3 newpos= ray.getPoint(2f);
+               // node.setLocalPosition(newpos);
                 if(rotate.equals("straight")) {
                     node.setLocalRotation(Quaternion.axisAngle(new Vector3(-.8f, 1.8f, 1.5f), 90f));
                 }
@@ -769,6 +876,15 @@ public class ARActivity extends AppCompatActivity implements Scene.OnUpdateListe
             }
 
             binding.timeleftText.setText(String.valueOf(navigationProgress.getTimeToGoal()));
+
+            if(navigationProgress.getDistanceToGoal()<4f & navigationProgress.getCurrentIndication()
+                    .toString().toLowerCase().contains("ahead") || navigationProgress.getCurrentIndication()
+                    .toString().toLowerCase().contains("straight")) {
+                reachedPOI_=true;
+            }
+            else {
+                reachedPOI_=false;
+            }
            // isModelPlaced=false;
             if(navigationProgress.getCurrentIndication().toString().toLowerCase().contains("left")) {
                 binding.arrow2d.setRotation(-90f);
@@ -778,7 +894,7 @@ public class ARActivity extends AppCompatActivity implements Scene.OnUpdateListe
             }
             else if(navigationProgress.getCurrentIndication().toString().toLowerCase().contains("straight")) {
                 isModelPlaced=false;
-               // changeDirection("straight");
+                //changeDirection("straight");
                 binding.arrow2d.setRotation(0f);
             }
             else if(navigationProgress.getCurrentIndication().toString().toLowerCase().contains("backward")) {
@@ -791,7 +907,7 @@ public class ARActivity extends AppCompatActivity implements Scene.OnUpdateListe
             else if(navigationProgress.getCurrentIndication().toString().toLowerCase().contains("right")){
                 binding.arrow2d.setRotation(90f);
                 isModelPlaced=false;
-               // changeDirection("right");
+                //changeDirection("right");
             }
             binding.indicText.setText(navigationProgress.getCurrentIndication().getOrientationType().toString());
             new android.os.Handler().postDelayed(new Runnable() {
@@ -820,10 +936,11 @@ public class ARActivity extends AppCompatActivity implements Scene.OnUpdateListe
                             @Override
                             public void run() {
                                 float[] position = {(float) point.getCartesianCoordinate().getX(),
-                                        (float) point.getCartesianCoordinate().getY(), (float)-2};      //  { x, y, z } position
+                                        (float) point.getCartesianCoordinate().getY(), (float)-0.02};      //  { x, y, z } position
                                 float[] rotation = { 0, 0, 0, 1 };
                                 Pose pose= new Pose(position, rotation);
                                 //addLineBetweenHits_2(point, pose);
+
                             }
                         },500);
 
@@ -908,7 +1025,7 @@ public class ARActivity extends AppCompatActivity implements Scene.OnUpdateListe
                     .getLatitude(), targetCoordinate.getLongitude(), new Consumer<VpsAvailability>() {
                 @Override
                 public void accept(VpsAvailability vpsAvailability) {
-                  //  Toast.makeText(ARActivity.this, String.valueOf(vpsAvailability.toString()), Toast.LENGTH_SHORT).show();
+                   // Toast.makeText(ARActivity.this, String.valueOf(vpsAvailability.toString()), Toast.LENGTH_SHORT).show();
                 }
             });
 

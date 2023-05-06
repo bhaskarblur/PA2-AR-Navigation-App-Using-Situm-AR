@@ -14,7 +14,7 @@ public class customARFrag extends ArFragment {
         config.setFocusMode(Config.FocusMode.AUTO);
         session.configure(config);
         this.getArSceneView().setupSession(session);
-        ( (ARActivity) getActivity()).setupImage(config,session);
+   //     ( (ARActivity) getActivity()).setupImage(config,session);
         return config;
     }
 }
