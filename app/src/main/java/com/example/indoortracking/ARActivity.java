@@ -260,10 +260,38 @@ public class ARActivity extends AppCompatActivity implements Scene.OnUpdateListe
         }
     }
 
+    private void setModelPlaced() {
+        float[] position = {(float) -0.095789626,
+                (float) -0.73789567, (float)-1.6033627};      //  { x, y, z } position
+        float[] rotation = { 0.1f, 0.1f, 0.1f, 1f };
+        ModelRenderable.builder().
+                setSource(
+                        ARActivity.this,
+                        RenderableSource
+                                .builder()
+                                .setSource(ARActivity.this, Uri.parse(
+                                                arrow_uri)
+                                        , RenderableSource.SourceType.GLTF2)
+                                .setScale(2.2f)
+                                .build())
+                .setRegistryId(arrow_uri)
+                .build()
+                .thenAccept(modelRenderable -> addModeltoScene_2(Objects.requireNonNull(arFragment.getArSceneView()
+                        .getSession()).createAnchor(new Pose(position, rotation)), modelRenderable, "straight"))
+                .exceptionally(throwable -> {
+                    //   Toast.makeText(ARActivity.this, "error:"+throwable.getCause(), Toast.LENGTH_SHORT).show();
+                    return null;
+                });
+    }
+
     private void addLineBetweenHits(HitResult hitResult, Plane plane, MotionEvent motionEvent) {
         Anchor anchor = hitResult.createAnchor();
         AnchorNode anchorNode = new AnchorNode(anchor);
-
+        Log.d("RayPoint", "Raypoint: "+anchorNode.getWorldPosition().x+","+
+                anchorNode.getWorldPosition().y+","+anchorNode.getWorldPosition().z);
+        Log.d("RayPoint", "RayRotate: "+anchorNode.getWorldRotation().x+","+
+                anchorNode.getWorldRotation().y+","+anchorNode.getWorldRotation().z+","+
+                anchorNode.getWorldRotation().w);
         if (lastAnchorNode != null) {
             anchorNode.setParent(arFragment.getArSceneView().getScene());
             Vector3 point1, point2;
@@ -440,9 +468,11 @@ public class ARActivity extends AppCompatActivity implements Scene.OnUpdateListe
 
         final boolean[] anchordone = {false};
 
+
         arFragment.setOnTapArPlaneListener(
                 (HitResult hitResult, Plane plane, MotionEvent motionEvent) -> {
-                    addLineBetweenHits(hitResult, plane, motionEvent);
+                    setModelPlaced();
+                    //addLineBetweenHits(hitResult, plane, motionEvent);
                 });
 
 
@@ -483,6 +513,32 @@ public class ARActivity extends AppCompatActivity implements Scene.OnUpdateListe
                 });
     }
 
+    private void addModeltoScene_2(Anchor anchor, ModelRenderable modelRenderable, String rotate) {
+        //AnchorNode node= new AnchorNode(anchor);
+        List<Node> children = new ArrayList<>(arFragment.getArSceneView().getScene().getChildren());
+        for (Node node_ : children) {
+            if (node_ instanceof AnchorNode) {
+                if (((AnchorNode) node_).getAnchor() != null) {
+                    ((AnchorNode) node_).getAnchor().detach();
+
+                }
+            }
+            if (!(node_ instanceof Camera) && !(node_ instanceof Sun)) {
+                node_.setParent(null);
+            }
+        }
+        Toast.makeText(this, "Hello", Toast.LENGTH_SHORT).show();
+        node = new Node();
+        node.setParent(arFragment.getArSceneView().getScene());
+        node.setRenderable(modelRenderable);
+        //  AnchorNode anchorNode1=new AnchorNode(anchor);
+        //anchorNode1.setRenderable(modelRenderable);
+        arFragment.getArSceneView().getScene().addChild(node);
+        node.setWorldPosition(new Vector3(anchor.getPose().getZAxis().length,
+                anchor.getPose().getYAxis().length, anchor.getPose().getZAxis().length));
+
+
+    }
     private void addModeltoScene(Anchor anchor, ModelRenderable modelRenderable, String rotate) {
         //AnchorNode node= new AnchorNode(anchor);
         List<Node> children = new ArrayList<>(arFragment.getArSceneView().getScene().getChildren());
@@ -678,6 +734,7 @@ public class ARActivity extends AppCompatActivity implements Scene.OnUpdateListe
             //binding.arrow2d.setVisibility(View.VISIBLE);
             binding.statusText.setText("Follow the route.");
             binding.progressBar.setVisibility(View.GONE);
+            navigationProgress.getNextIndication().getIndicationType().toString();
             Log.d("current indication", navigationProgress.getCurrentIndication().toString());
 
             if(String.valueOf(navigationProgress.getDistanceToClosestPointInRoute()).toString().length()>3) {
@@ -943,6 +1000,7 @@ public class ARActivity extends AppCompatActivity implements Scene.OnUpdateListe
     protected void onDestroy() {
         super.onDestroy();
         SitumSdk.navigationManager().removeUpdates();
+        locationListener=null;
         if(tts!=null) {
             tts.stop();
             tts.shutdown();
