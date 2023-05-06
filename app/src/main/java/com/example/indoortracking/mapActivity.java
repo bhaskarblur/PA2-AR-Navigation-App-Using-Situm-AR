@@ -382,11 +382,10 @@ public class mapActivity extends AppCompatActivity implements OnMapReadyCallback
         @Override
         public void onProgress(NavigationProgress navigationProgress) {
             if(!arrived) {
-                Toast.makeText(mapActivity.this,"current floor:"+
-                        navigationProgress.getClosestLocationInRoute().getFloorIdentifier(), Toast.LENGTH_SHORT).show();
+               // Toast.makeText(mapActivity.this,"current floor:"+
+                 //       navigationProgress.getClosestLocationInRoute().getFloorIdentifier(), Toast.LENGTH_SHORT).show();
                 Log.i(TAG, "Route advances");
                 hideProgress();
-                Toast.makeText(mapActivity.this, "first navigation", Toast.LENGTH_SHORT).show();
                 Toast.makeText(mapActivity.this, navigationProgress.getCurrentIndication().toText(mapActivity.this), Toast.LENGTH_SHORT).show();
                 //   FloorSelectorView floorSelectorView = findViewById(R.id.situm_floor_selector);
                 //  floorSelectorView.setFloorSelector(buildingInfo_.getBuilding(), googleMap, targetFloorId);
@@ -396,7 +395,7 @@ public class mapActivity extends AppCompatActivity implements OnMapReadyCallback
                 new Handler().postDelayed(new Runnable() {
                     @Override
                     public void run() {
-                        speakTTs(navigationProgress.getCurrentIndication().toText(mapActivity.this));
+                        //speakTTs(navigationProgress.getCurrentIndication().toText(mapActivity.this));
                     }
                 },6000);
 
@@ -444,7 +443,7 @@ public class mapActivity extends AppCompatActivity implements OnMapReadyCallback
                 current=latLng;
 
                 //current floor at which user is
-
+              //  Toast.makeText(mapActivity.this, "Hello", Toast.LENGTH_SHORT).show();
                 if (!poiplaced) {
                     SitumSdk.communicationManager().fetchBuildingInfo(buildingId, new es.situm.sdk.utils.Handler<BuildingInfo>() {
                         @Override
@@ -839,6 +838,7 @@ public class mapActivity extends AppCompatActivity implements OnMapReadyCallback
     public void finish() {
         getPoisUseCase.cancel();
         stopLocation();
+        locationManager.removeAllLocationListeners();
         SitumSdk.navigationManager().removeUpdates();
         super.finish();
     }

@@ -56,6 +56,7 @@
         android:layout_height="wrap_content"
         android:background="#F1F1F1"
         android:visibility="gone"
+        android:backgroundTint="#F1F1F1"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="parent">

@@ -54,6 +54,7 @@ import com.google.ar.core.FutureState;
 import com.google.ar.core.GeospatialPose;
 import com.google.ar.core.HitResult;
 import com.google.ar.core.Plane;
+import com.google.ar.core.Pose;
 import com.google.ar.core.Session;
 import com.google.ar.core.TrackingState;
 import com.google.ar.core.VpsAvailability;
@@ -78,6 +79,7 @@ import com.google.ar.sceneform.rendering.Color;
 import com.google.ar.sceneform.rendering.MaterialFactory;
 import com.google.ar.sceneform.rendering.ModelRenderable;
 import com.google.ar.sceneform.rendering.ShapeFactory;
+import com.google.ar.sceneform.rendering.Texture;
 import com.google.ar.sceneform.ux.ArFragment;
 import com.google.ar.sceneform.ux.BaseArFragment;
 
@@ -86,6 +88,7 @@ import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.function.Consumer;
@@ -190,6 +193,72 @@ public class ARActivity extends AppCompatActivity implements Scene.OnUpdateListe
 
     private Node nodeForLine;
 
+    private void createTestRoute() {
+        List<Point> points=new ArrayList<>();
+        //points.add(new Point());
+
+        for(Point point:points) {
+            float[] position = {(float) point.getCartesianCoordinate().getX(),
+                    (float) point.getCartesianCoordinate().getY(), (float)-1};      //  { x, y, z } position
+            float[] rotation = { 0, 0, 0, 1 };
+            Pose pose= new Pose(position, rotation);
+           // addLineBetweenHits_2(point, pose);
+        }
+    }
+    private void addLineBetweenHits_2(Point point, Pose pose) {
+       // Anchor anchor = arFragment.getArSceneView().getSession().createAnchor(arFragment.getArSceneView().getArFrame().getCamera().getPose());
+
+        Anchor anchor = arFragment.getArSceneView().getSession().createAnchor(pose);
+        AnchorNode anchorNode = new AnchorNode(anchor);
+
+        if (lastAnchorNode != null) {
+            anchorNode.setParent(arFragment.getArSceneView().getScene());
+            Vector3 point1, point2;
+            point1 = lastAnchorNode.getWorldPosition();
+            point2 = anchorNode.getWorldPosition();
+
+        /*
+            First, find the vector extending between the two points and define a look rotation
+            in terms of this Vector.
+        */
+            final Vector3 difference = Vector3.subtract(point1, point2);
+            final Vector3 directionFromTopToBottom = difference.normalized();
+            final Quaternion rotationFromAToB =
+                    Quaternion.lookRotation(directionFromTopToBottom, Vector3.up());
+            Texture.Sampler sampler = Texture.Sampler.builder()
+                    .setMinFilter(Texture.Sampler.MinFilter.LINEAR_MIPMAP_LINEAR)
+                    .setMagFilter(Texture.Sampler.MagFilter.LINEAR)
+                    // .setWrapModeR(Texture.Sampler.WrapMode.REPEAT)
+                    // .setWrapModeS(Texture.Sampler.WrapMode.REPEAT)
+                    // .setWrapModeT(Texture.Sampler.WrapMode.REPEAT)
+                    .build();
+
+            // 1. Make a texture
+            Texture.builder()
+                    .setSource(() ->    getApplicationContext().getAssets().open("arrow_texture.png"))
+                    .setSampler(sampler)
+                    .build().thenAccept(texture -> {
+                        MaterialFactory.makeTransparentWithTexture(getApplicationContext(),texture) //new Color(0, 255, 244))
+                                .thenAccept(
+                                        material -> {
+/* Then, create a rectangular prism, using ShapeFactory.makeCube() and use the difference vector
+       to extend to the necessary length.  */
+                                            ModelRenderable model = ShapeFactory.makeCube(
+                                                    new Vector3(.118f, .008f, difference.length()),
+                                                    Vector3.zero(), material);
+/* Last, set the world rotation of the node to the rotation calculated earlier and set the world position to
+       the midpoint between the given points . */
+                                            Node node = new Node();
+                                            node.setParent(anchorNode);
+                                            node.setRenderable(model);
+                                            node.setWorldPosition(Vector3.add(point1, point2).scaled(.5f));
+                                            node.setWorldRotation(rotationFromAToB);
+                                        }
+                                );
+                    });
+            lastAnchorNode = anchorNode;
+        }
+    }
 
     private void addLineBetweenHits(HitResult hitResult, Plane plane, MotionEvent motionEvent) {
         Anchor anchor = hitResult.createAnchor();
@@ -209,23 +278,37 @@ public class ARActivity extends AppCompatActivity implements Scene.OnUpdateListe
             final Vector3 directionFromTopToBottom = difference.normalized();
             final Quaternion rotationFromAToB =
                     Quaternion.lookRotation(directionFromTopToBottom, Vector3.up());
-            MaterialFactory.makeOpaqueWithColor(getApplicationContext(), new Color(0, 255, 244))
-                    .thenAccept(
-                            material -> {
+            Texture.Sampler sampler = Texture.Sampler.builder()
+                    .setMinFilter(Texture.Sampler.MinFilter.LINEAR_MIPMAP_LINEAR)
+                    .setMagFilter(Texture.Sampler.MagFilter.LINEAR)
+                   // .setWrapModeR(Texture.Sampler.WrapMode.REPEAT)
+                   // .setWrapModeS(Texture.Sampler.WrapMode.REPEAT)
+                   // .setWrapModeT(Texture.Sampler.WrapMode.REPEAT)
+                    .build();
+
+            // 1. Make a texture
+            Texture.builder()
+                    .setSource(() ->    getApplicationContext().getAssets().open("arrow_texture.png"))
+                    .setSampler(sampler)
+                    .build().thenAccept(texture -> {
+                                MaterialFactory.makeTransparentWithTexture(getApplicationContext(),texture) //new Color(0, 255, 244))
+                                        .thenAccept(
+                                                material -> {
 /* Then, create a rectangular prism, using ShapeFactory.makeCube() and use the difference vector
        to extend to the necessary length.  */
-                                ModelRenderable model = ShapeFactory.makeCube(
-                                        new Vector3(.08f, .008f, difference.length()),
-                                        Vector3.zero(), material);
+                                                    ModelRenderable model = ShapeFactory.makeCube(
+                                                            new Vector3(.118f, .008f, difference.length()),
+                                                            Vector3.zero(), material);
 /* Last, set the world rotation of the node to the rotation calculated earlier and set the world position to
        the midpoint between the given points . */
-                                Node node = new Node();
-                                node.setParent(anchorNode);
-                                node.setRenderable(model);
-                                node.setWorldPosition(Vector3.add(point1, point2).scaled(.5f));
-                                node.setWorldRotation(rotationFromAToB);
-                            }
-                    );
+                                                    Node node = new Node();
+                                                    node.setParent(anchorNode);
+                                                    node.setRenderable(model);
+                                                    node.setWorldPosition(Vector3.add(point1, point2).scaled(.5f));
+                                                    node.setWorldRotation(rotationFromAToB);
+                                                }
+                                        );
+                            });
             lastAnchorNode = anchorNode;
         }
     }
@@ -342,10 +425,11 @@ public class ARActivity extends AppCompatActivity implements Scene.OnUpdateListe
         }
     }
 
-    private Anchor sampleAnchor;
     private void manageUI() {
         arFragment= (ArFragment) getSupportFragmentManager().findFragmentById(R.id.arFragment);
-        arFragment.getArSceneView().setupSession(mSession);
+        if(mSession!=null) {
+            arFragment.getArSceneView().setupSession(mSession);
+        }
         binding.close.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
@@ -370,28 +454,6 @@ public class ARActivity extends AppCompatActivity implements Scene.OnUpdateListe
         AugmentedImageDatabase database= new AugmentedImageDatabase(session);
         database.addImage("arrow",image);
         config.setAugmentedImageDatabase(database);
-    }
-
-    private void createLineBetweenAnchors() {
-
-        Vector3 startWorldPosition = startNode.getWorldPosition();
-        Vector3 endWorldPosition = endNode.getWorldPosition();
-        Vector3 difference = Vector3.subtract(endWorldPosition, startWorldPosition);
-        float length = difference.length();
-
-        // Create a cylinder with a height equal to the distance between anchors.
-        MaterialFactory.makeOpaqueWithColor(this,
-                        new Color(getResources().getColor(R.color.redPrimary)))
-                .thenAccept(material -> {
-                    ModelRenderable model = ShapeFactory.makeCylinder(0.04f, length, new Vector3(0f, length / 2, 0f), material);
-                    Node node = new Node();
-                    node.setRenderable(model);
-                    node.setParent(startNode);
-
-                    // Rotate the cylinder to align it with the line between anchors.
-                    Quaternion rotation = Quaternion.lookRotation(difference, Vector3.up());
-                    node.setWorldRotation(rotation);
-                });
     }
 
     private void changeDirection(String rotate) {
@@ -672,7 +734,19 @@ public class ARActivity extends AppCompatActivity implements Scene.OnUpdateListe
             for (RouteSegment segment : navigationProgress.getSegments()) {
                 Log.i(TAG, "   Floor Id: " + segment.getFloorIdentifier());
                 for (Point point : segment.getPoints()) {
+                    if(mSession!=null) {
+                        new android.os.Handler().postDelayed(new Runnable() {
+                            @Override
+                            public void run() {
+                                float[] position = {(float) point.getCartesianCoordinate().getX(),
+                                        (float) point.getCartesianCoordinate().getY(), (float)-2};      //  { x, y, z } position
+                                float[] rotation = { 0, 0, 0, 1 };
+                                Pose pose= new Pose(position, rotation);
+                                //addLineBetweenHits_2(point, pose);
+                            }
+                        },500);
 
+                    }
                     Log.i(TAG, "    Point: BuildingId " + point.getFloorIdentifier() + " FloorId " + point.getFloorIdentifier() + " Latitude " + point.getCoordinate().getLatitude() + " Longitude " + point.getCoordinate().getLongitude());
                 }
                 Log.i(TAG, "    ----");
@@ -778,7 +852,7 @@ public class ARActivity extends AppCompatActivity implements Scene.OnUpdateListe
                                             1f,
                                             1f,
                                             1f);
-                            sampleAnchor=anchor;
+                           // sampleAnchor=anchor;
                             Toast.makeText(this, "Tracking!", Toast.LENGTH_SHORT).show();
                         }
 
