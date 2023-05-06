@@ -30,7 +30,6 @@ import android.content.pm.ResolveInfo;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 
-import android.location.LocationManager;
 import android.media.AudioManager;
 import android.net.Uri;
 import android.os.Build;
@@ -41,7 +40,6 @@ import android.view.MotionEvent;
 import android.view.View;
 import android.widget.Toast;
 
-import com.example.indoortracking.assets.MainActivity;
 import com.example.indoortracking.databinding.ActivityAractivityBinding;
 import com.google.ar.core.Anchor;
 import com.google.ar.core.ArCoreApk;
@@ -88,7 +86,6 @@ import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
-import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.function.Consumer;
@@ -103,6 +100,9 @@ import es.situm.sdk.navigation.NavigationRequest;
 import es.situm.sdk.utils.Handler;
 import uk.co.appoly.arcorelocation.LocationMarker;
 import uk.co.appoly.arcorelocation.LocationScene;
+import uk.co.appoly.arcorelocation.rendering.LocationNode;
+import uk.co.appoly.arcorelocation.rendering.LocationNodeRender;
+import uk.co.appoly.arcorelocation.utils.ARLocationPermissionHelper;
 
 public class ARActivity extends AppCompatActivity implements Scene.OnUpdateListener{
     // to be changed with intent data
@@ -244,7 +244,7 @@ public class ARActivity extends AppCompatActivity implements Scene.OnUpdateListe
 /* Then, create a rectangular prism, using ShapeFactory.makeCube() and use the difference vector
        to extend to the necessary length.  */
                                             ModelRenderable model = ShapeFactory.makeCube(
-                                                    new Vector3(.118f, .008f, difference.length()),
+                                                    new Vector3(.2f, .008f, difference.length()),
                                                     Vector3.zero(), material);
 /* Last, set the world rotation of the node to the rotation calculated earlier and set the world position to
        the midpoint between the given points . */
@@ -260,28 +260,72 @@ public class ARActivity extends AppCompatActivity implements Scene.OnUpdateListe
         }
     }
 
-    private void setModelPlaced() {
-        float[] position = {(float) -0.095789626,
-                (float) -0.73789567, (float)-1.6033627};      //  { x, y, z } position
-        float[] rotation = { 0.1f, 0.1f, 0.1f, 1f };
-        ModelRenderable.builder().
-                setSource(
-                        ARActivity.this,
-                        RenderableSource
-                                .builder()
-                                .setSource(ARActivity.this, Uri.parse(
-                                                arrow_uri)
-                                        , RenderableSource.SourceType.GLTF2)
-                                .setScale(2.2f)
-                                .build())
+
+
+    private void placePOI() {
+        CompletableFuture<ModelRenderable> andy = ModelRenderable.builder()
+                .setSource(
+                ARActivity.this,
+                RenderableSource
+                        .builder()
+                        .setSource(ARActivity.this, Uri.parse(
+                                        arrow_uri)
+                                , RenderableSource.SourceType.GLTF2)
+                        .setScale(2.2f)
+                        .build())
                 .setRegistryId(arrow_uri)
                 .build()
-                .thenAccept(modelRenderable -> addModeltoScene_2(Objects.requireNonNull(arFragment.getArSceneView()
-                        .getSession()).createAnchor(new Pose(position, rotation)), modelRenderable, "straight"))
                 .exceptionally(throwable -> {
-                    //   Toast.makeText(ARActivity.this, "error:"+throwable.getCause(), Toast.LENGTH_SHORT).show();
+                       Toast.makeText(ARActivity.this, "error:"+throwable.getCause(), Toast.LENGTH_SHORT).show();
                     return null;
                 });
+
+        Toast.makeText(this, "first", Toast.LENGTH_SHORT).show();
+        CompletableFuture.allOf(andy)
+                .handle(
+                        (notUsed, throwable) ->
+                        {
+                            if (throwable != null) {
+                                Toast.makeText(this, "Unable to load renderables", Toast.LENGTH_SHORT).show();
+                                return null;
+                            }
+
+                            try {
+                                andyRenderable = andy.get();
+
+                            } catch (InterruptedException | ExecutionException ex) {
+                                Toast.makeText(this, "Unable to load renderables", Toast.LENGTH_SHORT).show();
+                            }
+                            return null;
+                        });
+
+        Frame frame= arFragment.getArSceneView().getArFrame();
+        arFragment.getArSceneView().getScene().
+                addOnUpdateListener(
+                        frameTime -> {
+
+                            if (locationScene == null) {
+                                Node base = new Node();
+                                base.setRenderable(andyRenderable);
+                                locationScene = new LocationScene(this,
+                                        arFragment.getArSceneView());
+                                locationScene.setMinimalRefreshing(true);
+                                locationScene.setRefreshAnchorsAsLocationChanges(true);
+                                locationScene.setOffsetOverlapping(true);
+                                locationScene.mLocationMarkers.add(
+                                        new LocationMarker(
+                                                75.8317506,
+                                                30.9191793,
+                                              base));
+
+                                Toast.makeText(this, "Placed POI", Toast.LENGTH_SHORT).show();
+                            }
+                            if (locationScene != null) {
+                                locationScene.processFrame(frame);
+                            }
+
+                        });
+        ARLocationPermissionHelper.requestPermission(this);
     }
 
     private void addLineBetweenHits(HitResult hitResult, Plane plane, MotionEvent motionEvent) {
@@ -325,7 +369,7 @@ public class ARActivity extends AppCompatActivity implements Scene.OnUpdateListe
 /* Then, create a rectangular prism, using ShapeFactory.makeCube() and use the difference vector
        to extend to the necessary length.  */
                                                     ModelRenderable model = ShapeFactory.makeCube(
-                                                            new Vector3(.118f, .008f, difference.length()),
+                                                            new Vector3(.2f, .008f, difference.length()),
                                                             Vector3.zero(), material);
 /* Last, set the world rotation of the node to the rotation calculated earlier and set the world position to
        the midpoint between the given points . */
@@ -381,6 +425,7 @@ public class ARActivity extends AppCompatActivity implements Scene.OnUpdateListe
     private Node getAndy() {
         Node base = new Node();
         base.setRenderable(andyRenderable);
+        arFragment.getArSceneView().getScene().addChild(base);
         Context c = this;
         base.setOnTapListener((v, event) -> {
             Toast.makeText(
@@ -449,6 +494,8 @@ public class ARActivity extends AppCompatActivity implements Scene.OnUpdateListe
             buildingId = bundle.getString("buildingId");
             targetFloorId = bundle.getString("floorId");
             POIid = bundle.getString("poiId");
+            String poiname= bundle.getString("poiName");
+            binding.poiText.setText(poiname);
             targetCoordinate = new Coordinate(bundle.getDouble("PoicoordinateX"), bundle.getDouble("PoicoordinateY"));
         }
     }
@@ -468,11 +515,10 @@ public class ARActivity extends AppCompatActivity implements Scene.OnUpdateListe
 
         final boolean[] anchordone = {false};
 
-
         arFragment.setOnTapArPlaneListener(
                 (HitResult hitResult, Plane plane, MotionEvent motionEvent) -> {
-                    setModelPlaced();
-                    //addLineBetweenHits(hitResult, plane, motionEvent);
+                    //setModelPlaced();
+                    addLineBetweenHits(hitResult, plane, motionEvent);
                 });
 
 
@@ -513,32 +559,6 @@ public class ARActivity extends AppCompatActivity implements Scene.OnUpdateListe
                 });
     }
 
-    private void addModeltoScene_2(Anchor anchor, ModelRenderable modelRenderable, String rotate) {
-        //AnchorNode node= new AnchorNode(anchor);
-        List<Node> children = new ArrayList<>(arFragment.getArSceneView().getScene().getChildren());
-        for (Node node_ : children) {
-            if (node_ instanceof AnchorNode) {
-                if (((AnchorNode) node_).getAnchor() != null) {
-                    ((AnchorNode) node_).getAnchor().detach();
-
-                }
-            }
-            if (!(node_ instanceof Camera) && !(node_ instanceof Sun)) {
-                node_.setParent(null);
-            }
-        }
-        Toast.makeText(this, "Hello", Toast.LENGTH_SHORT).show();
-        node = new Node();
-        node.setParent(arFragment.getArSceneView().getScene());
-        node.setRenderable(modelRenderable);
-        //  AnchorNode anchorNode1=new AnchorNode(anchor);
-        //anchorNode1.setRenderable(modelRenderable);
-        arFragment.getArSceneView().getScene().addChild(node);
-        node.setWorldPosition(new Vector3(anchor.getPose().getZAxis().length,
-                anchor.getPose().getYAxis().length, anchor.getPose().getZAxis().length));
-
-
-    }
     private void addModeltoScene(Anchor anchor, ModelRenderable modelRenderable, String rotate) {
         //AnchorNode node= new AnchorNode(anchor);
         List<Node> children = new ArrayList<>(arFragment.getArSceneView().getScene().getChildren());
@@ -672,6 +692,7 @@ public class ARActivity extends AppCompatActivity implements Scene.OnUpdateListe
                 // which allows us to receive updates while the user moves along the route
                 isNavigating = true;
                 if(routeFound==false) {
+
                     binding.statusText.setText("Finding shortest route to your destination.");
                     speakTTs("Finding shortest route to your destination.");
                     routeFound=true;
@@ -772,7 +793,7 @@ public class ARActivity extends AppCompatActivity implements Scene.OnUpdateListe
                 isModelPlaced=false;
                // changeDirection("right");
             }
-            binding.indicText.setText(navigationProgress.getCurrentIndication().getIndicationType().toString());
+            binding.indicText.setText(navigationProgress.getCurrentIndication().getOrientationType().toString());
             new android.os.Handler().postDelayed(new Runnable() {
                 @Override
                 public void run() {
@@ -996,8 +1017,6 @@ public class ARActivity extends AppCompatActivity implements Scene.OnUpdateListe
         }
         return false;
     }
-
-
 
     @Override
     protected void onDestroy() {

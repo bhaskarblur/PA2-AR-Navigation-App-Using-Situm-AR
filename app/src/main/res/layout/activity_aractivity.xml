@@ -22,7 +22,7 @@
         app:layout_constraintTop_toTopOf="parent">
 
         <TextView
-            android:id="@+id/status_text"
+            android:id="@+id/poi_text"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_marginStart="20dp"
@@ -46,7 +46,7 @@
             android:layout_height="32dp"
             android:layout_marginStart="20dp"
             android:layout_marginTop="20dp"
-            android:tint="#fff"
+            app:tint="#fff"
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintTop_toTopOf="parent"
             app:srcCompat="@drawable/close_icon" />
@@ -56,11 +56,11 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginStart="20dp"
-            android:layout_marginTop="15dp"
+            android:layout_marginTop="17dp"
             android:layout_marginEnd="20dp"
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintStart_toEndOf="@+id/constraintLayout4"
-            app:layout_constraintTop_toBottomOf="@+id/status_text">
+            app:layout_constraintTop_toBottomOf="@+id/poi_text">
 
             <TextView
                 android:id="@+id/indicText2"
@@ -84,7 +84,7 @@
                 android:maxLength="6"
                 android:text="Wait"
                 android:textColor="#fff"
-                android:textSize="21sp"
+                android:textSize="19sp"
                 app:layout_constraintEnd_toEndOf="parent"
                 app:layout_constraintStart_toStartOf="parent"
                 app:layout_constraintTop_toBottomOf="@+id/indicText2" />
@@ -99,7 +99,7 @@
             android:layout_marginEnd="20dp"
             app:layout_constraintEnd_toStartOf="@+id/constraintLayout5"
             app:layout_constraintStart_toEndOf="@+id/constraintLayout2"
-            app:layout_constraintTop_toBottomOf="@+id/status_text">
+            app:layout_constraintTop_toBottomOf="@+id/poi_text">
 
             <TextView
                 android:id="@+id/timeleftText2"
@@ -138,7 +138,7 @@
             android:layout_marginEnd="20dp"
             app:layout_constraintEnd_toStartOf="@+id/constraintLayout4"
             app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toBottomOf="@+id/status_text">
+            app:layout_constraintTop_toBottomOf="@+id/poi_text">
 
             <TextView
                 android:id="@+id/distanceleftText2"
