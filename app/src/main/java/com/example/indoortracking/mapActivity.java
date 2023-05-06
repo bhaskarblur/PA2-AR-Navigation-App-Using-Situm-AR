@@ -86,12 +86,14 @@ public class mapActivity extends AppCompatActivity implements OnMapReadyCallback
     private String buildingId = "13347";
     private String targetFloorId = "42059";
     private String EmrFloorId = "42059";
+    private String selectedPoiName;
     // 42059
     private Boolean routesFound=false;
     private LocationManager locationManager;
     private Coordinate targetCoordinate =
             new Coordinate(30.919247, 75.831841);
     private List<Polyline> polylines = new ArrayList<>();
+
     private CoordinateConverter coordinateConverter;
     private commons commons;
     private boolean isNavigating = false;
@@ -196,6 +198,7 @@ public class mapActivity extends AppCompatActivity implements OnMapReadyCallback
                 bundle.putString("buildingId",buildingId);
                 bundle.putString("floorId",targetFloorId);
                 bundle.putString("poiId", selectedPoiId);
+                bundle.putString("poiName", selectedPoiName);
                 // these are raw coordinates, not cartiesian.
                 bundle.putString("poiCoordinateX",selectedCoordinateX);
                 bundle.putString("poiCoordinateY", selectedCoordinateY);
@@ -244,6 +247,7 @@ public class mapActivity extends AppCompatActivity implements OnMapReadyCallback
                                 selectedCoordinateX=String.valueOf(marker.getPosition().latitude);
                                 selectedCoordinateY=String.valueOf(marker.getPosition().longitude);
                                 selectedPoiId= poi.getIdentifier();
+                                selectedPoiName= poi.getName().toString();
                                 CartesianCoordinate cartesianCoordinate = coordinateConverter.toCartesianCoordinate(coordinate);
                                 //Toast.makeText(mapActivity.this, marker.getTitle(), Toast.LENGTH_SHORT).show();
                                 targetCoordinate= coordinate;

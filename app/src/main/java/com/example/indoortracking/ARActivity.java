@@ -105,7 +105,7 @@ import uk.co.appoly.arcorelocation.rendering.LocationNode;
 import uk.co.appoly.arcorelocation.rendering.LocationNodeRender;
 import uk.co.appoly.arcorelocation.utils.ARLocationPermissionHelper;
 
-public class ARActivity extends AppCompatActivity implements Scene.OnUpdateListener{
+public class ARActivity extends AppCompatActivity{
     // to be changed with intent data
     private String buildingId = "13347";
     private String targetFloorId = "42059";
@@ -197,18 +197,6 @@ public class ARActivity extends AppCompatActivity implements Scene.OnUpdateListe
 
     private Node nodeForLine;
 
-    private void createTestRoute() {
-        List<Point> points=new ArrayList<>();
-        //points.add(new Point());
-
-        for(Point point:points) {
-            float[] position = {(float) point.getCartesianCoordinate().getX(),
-                    (float) point.getCartesianCoordinate().getY(), (float)-1};      //  { x, y, z } position
-            float[] rotation = { 0, 0, 0, 1 };
-            Pose pose= new Pose(position, rotation);
-           // addLineBetweenHits_2(point, pose);
-        }
-    }
     private void addLineBetweenHits_2(Point point, Pose pose) {
        // Anchor anchor = arFragment.getArSceneView().getSession().createAnchor(arFragment.getArSceneView().getArFrame().getCamera().getPose());
         Frame frame= arFragment.getArSceneView().getArFrame();
@@ -240,7 +228,6 @@ public class ARActivity extends AppCompatActivity implements Scene.OnUpdateListe
                         // .setWrapModeS(Texture.Sampler.WrapMode.REPEAT)
                         // .setWrapModeT(Texture.Sampler.WrapMode.REPEAT)
                         .build();
-
                 // 1. Make a texture
                 Texture.builder()
                         .setSource(() -> getApplicationContext().getAssets().open("arrow_texture.png"))
@@ -268,7 +255,6 @@ public class ARActivity extends AppCompatActivity implements Scene.OnUpdateListe
             }
         }
     }
-
 
     private void placePOI2() {
         ModelRenderable.builder().
@@ -348,86 +334,6 @@ public class ARActivity extends AppCompatActivity implements Scene.OnUpdateListe
 
 
     }
-    private void placePOI() {
-        CompletableFuture<ModelRenderable> andy = ModelRenderable.builder()
-                .setSource(
-                ARActivity.this,
-                RenderableSource
-                        .builder()
-                        .setSource(ARActivity.this, Uri.parse(
-                                        arrow_uri)
-                                , RenderableSource.SourceType.GLTF2)
-                        .setScale(2.2f)
-                        .build())
-                .setRegistryId(arrow_uri)
-                .build()
-                .exceptionally(throwable -> {
-                       Toast.makeText(ARActivity.this, "error:"+throwable.getCause(), Toast.LENGTH_SHORT).show();
-                    return null;
-                });
-
-
-        Toast.makeText(this, "first", Toast.LENGTH_SHORT).show();
-        CompletableFuture.allOf(andy)
-                .handle(
-                        (notUsed, throwable) ->
-                        {
-                            if (throwable != null) {
-                                Toast.makeText(this, "Unable to load renderables", Toast.LENGTH_SHORT).show();
-                                return null;
-                            }
-
-                            try {
-                                andyRenderable = andy.get();
-                                ModelRenderable.builder().
-                                        setSource(
-                                                ARActivity.this,
-                                                RenderableSource
-                                                        .builder()
-                                                        .setSource(ARActivity.this, Uri.parse(
-                                                                        arrow_uri)
-                                                                , RenderableSource.SourceType.GLTF2)
-                                                        .setScale(2.2f)
-                                                        .build())
-                                        .setRegistryId(arrow_uri)
-                                        .build()
-                                        .thenAccept(modelRenderable -> andyRenderable = modelRenderable);
-
-                            } catch (InterruptedException | ExecutionException ex) {
-                                Toast.makeText(this, "Unable to load renderables", Toast.LENGTH_SHORT).show();
-                            }
-                            return null;
-                        });
-
-        Frame frame= arFragment.getArSceneView().getArFrame();
-        arFragment.getArSceneView().getScene().
-                addOnUpdateListener(
-                        frameTime -> {
-
-                            if (locationScene == null) {
-                                Node base = new Node();
-                                base.setParent(arFragment.getArSceneView().getScene());
-                                base.setRenderable(andyRenderable);
-                                locationScene = new LocationScene(this,
-                                        arFragment.getArSceneView());
-                                locationScene.setMinimalRefreshing(true);
-                                locationScene.setRefreshAnchorsAsLocationChanges(true);
-                                locationScene.setOffsetOverlapping(true);
-                                locationScene.mLocationMarkers.add(
-                                        new LocationMarker(
-                                                75.8317506,
-                                                30.9191793,
-                                              base));
-
-                                Toast.makeText(this, "Placed POI", Toast.LENGTH_SHORT).show();
-                            }
-                            if (locationScene != null) {
-                                locationScene.processFrame(frame);
-                            }
-
-                        });
-        ARLocationPermissionHelper.requestPermission(this);
-    }
 
     private void addLineBetweenHits(HitResult hitResult, Plane plane, MotionEvent motionEvent) {
         Anchor anchor = hitResult.createAnchor();
@@ -458,7 +364,7 @@ public class ARActivity extends AppCompatActivity implements Scene.OnUpdateListe
                    // .setWrapModeS(Texture.Sampler.WrapMode.REPEAT)
                    // .setWrapModeT(Texture.Sampler.WrapMode.REPEAT)
                     .build();
-
+            Toast.makeText(this, String.valueOf(difference.length()), Toast.LENGTH_SHORT).show();
             // 1. Make a texture
             Texture.builder()
                     .setSource(() ->    getApplicationContext().getAssets().open("arrow_texture.png"))
@@ -470,71 +376,23 @@ public class ARActivity extends AppCompatActivity implements Scene.OnUpdateListe
 /* Then, create a rectangular prism, using ShapeFactory.makeCube() and use the difference vector
        to extend to the necessary length.  */
                                                     ModelRenderable model = ShapeFactory.makeCube(
-                                                            new Vector3(.2f, .008f, difference.length()),
+                                                            new Vector3(.2f, .008f, 1.3f),
                                                             Vector3.zero(), material);
 /* Last, set the world rotation of the node to the rotation calculated earlier and set the world position to
        the midpoint between the given points . */
                                                     Node node = new Node();
                                                     node.setParent(anchorNode);
                                                     node.setRenderable(model);
-                                                    node.setWorldPosition(Vector3.add(point1, point2).scaled(.5f));
-                                                    node.setWorldRotation(rotationFromAToB);
+                                                   // node.setWorldPosition(Vector3.add(point1, point2).scaled(.5f));
+                                                    node.setLocalPosition(new Vector3(0, 0, -2.3f));
+                                                   // node.setWorldRotation(rotationFromAToB);
                                                 }
                                         );
                             });
             lastAnchorNode = anchorNode;
         }
     }
-        private void drawLine (AnchorNode node1, AnchorNode node2, Point p1, Point p2){
-            //Draw a line between two AnchorNodes (adapted from https://stackoverflow.com/a/52816504/334402)
-            Log.d(TAG, "drawLine");
-            Vector3 point1, point2;
-            point1 = node1.getWorldPosition();
-            point2 = node2.getWorldPosition();
 
-
-            //First, find the vector extending between the two points and define a look rotation
-            //in terms of this Vector.
-            final Vector3 difference = Vector3.subtract(point1, point2);
-            final Vector3 directionFromTopToBottom = difference.normalized();
-            final Quaternion rotationFromAToB =
-                    Quaternion.lookRotation(directionFromTopToBottom, Vector3.up());
-            MaterialFactory.makeOpaqueWithColor(getApplicationContext(), new Color(0, 255, 244))
-                    .thenAccept(
-                            material -> {
-                            /* Then, create a rectangular prism, using ShapeFactory.makeCube() and use the difference vector
-                                   to extend to the necessary length.  */
-                                Log.d(TAG, "drawLine inside .thenAccept");
-                                ModelRenderable model = ShapeFactory.makeCube(
-                                        new Vector3(.5f, .1f, difference.length()),
-                                        Vector3.zero(), material);
-                            /* Last, set the world rotation of the node to the rotation calculated earlier and set the world position to
-                                   the midpoint between the given points . */
-                                Anchor lineAnchor = node2.getAnchor();
-                                nodeForLine = new Node();
-                                nodeForLine.setParent(node1);
-                                nodeForLine.setRenderable(model);
-                                nodeForLine.setWorldPosition(Vector3.add(point1, point2).scaled(.5f));
-                                nodeForLine.setWorldRotation(rotationFromAToB);
-                                arFragment.getArSceneView().getScene().addChild(nodeForLine);
-                            }
-                    );
-
-        }
-
-
-    private Node getAndy() {
-        Node base = new Node();
-        base.setRenderable(andyRenderable);
-        arFragment.getArSceneView().getScene().addChild(base);
-        Context c = this;
-        base.setOnTapListener((v, event) -> {
-            Toast.makeText(
-                            c, "Andy touched.", Toast.LENGTH_LONG)
-                    .show();
-        });
-        return base;
-    }
     private void setupTTs() {
         PackageManager pm = getPackageManager();
         Intent installIntent = new Intent();
@@ -638,8 +496,6 @@ public class ARActivity extends AppCompatActivity implements Scene.OnUpdateListe
 
 
     }
-
-
 
     private void changeDirection(String rotate) {
 
@@ -868,17 +724,19 @@ public class ARActivity extends AppCompatActivity implements Scene.OnUpdateListe
             navigationProgress.getNextIndication().getIndicationType().toString();
             Log.d("current indication", navigationProgress.getCurrentIndication().toString());
 
-            if(String.valueOf(navigationProgress.getDistanceToClosestPointInRoute()).toString().length()>3) {
-                binding.distanceleftText.setText(String.valueOf(navigationProgress.getDistanceToGoal())
-                        .substring(0, 4) + "M");
+            if(String.valueOf(navigationProgress.getDistanceToClosestPointInRoute()).toString().length()>5) {
+                binding.distanceleftText.setText(String.valueOf(navigationProgress.getDistanceToGoal() * 3.281)
+                        .substring(0, 5) + "Ft");
             }
             else{
-                binding.distanceleftText.setText(String.valueOf(navigationProgress.getDistanceToGoal())
-                        .substring(0, 3) + "I");
+                binding.distanceleftText.setText(String.valueOf(navigationProgress.getDistanceToGoal() * 3.281)
+                        .substring(0, 4) + "Ft");
             }
-            boolean distanceLeftTrue = (int) navigationProgress.getDistanceToGoal()<8;
+            boolean distanceLeftTrue = (int) navigationProgress.getDistanceToGoal()<7;
 
-            binding.timeleftText.setText(String.valueOf(navigationProgress.getTimeToGoal()));
+            //here assuming the walk speed at 1.5m/sec
+            binding.timeleftText.setText(String.valueOf((navigationProgress.getTimeToGoal()/1.5)/60)
+                    .toString().substring(0, 3)+"min");
          //   Toast.makeText(ARActivity.this, String.valueOf(distanceLeftTrue), Toast.LENGTH_SHORT).show();
             if(navigationProgress.getCurrentIndication()
                     .toString().toLowerCase().contains("straight") && distanceLeftTrue) {
@@ -1150,35 +1008,7 @@ public class ARActivity extends AppCompatActivity implements Scene.OnUpdateListe
         arrived=true;
     }
 
-    @Override
-    public void onUpdate(FrameTime frameTime) {
 
-        Frame frame= arFragment.getArSceneView().getArFrame();
-        Collection<AugmentedImage> images= frame.getUpdatedTrackables(AugmentedImage.class);
-        for(AugmentedImage image: images) {
-            if(image.getTrackingState()== TrackingState.TRACKING) {
-                if(image.getName().equals("arrow")) {
-                    Anchor anchor = image.createAnchor(image.getCenterPose());
-                    createModel(anchor);
-                }
-            }
-        }
-
-    }
-
-    private void createModel(Anchor anchor) {
-        ModelRenderable.builder()
-                .setSource(this, Uri.parse(arrow_uri))
-                .build()
-                .thenAccept(modelRenderable -> {
-                    placeModel(anchor, modelRenderable);
-                }).exceptionally(new Function<Throwable, Void>() {
-                    @Override
-                    public Void apply(Throwable throwable) {
-                        return null;
-                    }
-                });
-    }
 
     @Override
     protected void onResume() {
@@ -1224,9 +1054,4 @@ public class ARActivity extends AppCompatActivity implements Scene.OnUpdateListe
 
     }
 
-    private void placeModel(Anchor anchor, ModelRenderable modelRenderable) {
-        AnchorNode anchorNode1=new AnchorNode(anchor);
-        anchorNode1.setRenderable(modelRenderable);
-        arFragment.getArSceneView().getScene().addChild(anchorNode1);
-    }
 }
