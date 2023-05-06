@@ -279,7 +279,7 @@ public class ARActivity extends AppCompatActivity implements Scene.OnUpdateListe
                                 .setSource(ARActivity.this, Uri.parse(
                                                 poi_uri)
                                         , RenderableSource.SourceType.GLTF2)
-                                .setScale(12.2f)
+                                .setScale(4.2f)
                                 .build())
                 .setRegistryId(poi_uri)
                 .build()
@@ -294,8 +294,7 @@ public class ARActivity extends AppCompatActivity implements Scene.OnUpdateListe
         //AnchorNode node= new AnchorNode(anchor);
         List<Node> children = new ArrayList<>(arFragment.getArSceneView().getScene().getChildren());
         node = new Node();
-        node.setParent(arFragment.getArSceneView().getScene());
-        node.setRenderable(modelRenderable);
+
         arFragment.getArSceneView().getScene().addOnUpdateListener(new Scene.OnUpdateListener() {
             @Override
             public void onUpdate(FrameTime frameTime) {
@@ -314,11 +313,14 @@ public class ARActivity extends AppCompatActivity implements Scene.OnUpdateListe
 
                     //  AnchorNode anchorNode1=new AnchorNode(anchor);
                     //anchorNode1.setRenderable(modelRenderable);
+                    node.setParent(arFragment.getArSceneView().getScene());
+                    node.setRenderable(modelRenderable);
                     arFragment.getArSceneView().getScene().addChild(node);
                     Camera camera = arFragment.getArSceneView().getScene().getCamera();
-                    Ray ray = camera.screenPointToRay(1080 / 2f, 2360 / 2f);
-                    Vector3 newpos = ray.getPoint(10f);
+                    Ray ray = camera.screenPointToRay(1080 / 2f, 2660 / 2f);
+                    Vector3 newpos = ray.getPoint(24f);
                     node.setLocalPosition(newpos);
+                    node.setLocalRotation(Quaternion.axisAngle(new Vector3(-1f, 0f, 0f), 30f));
                 }
                 else {
                //     Toast.makeText(ARActivity.this, "removed", Toast.LENGTH_SHORT).show();
@@ -786,9 +788,9 @@ public class ARActivity extends AppCompatActivity implements Scene.OnUpdateListe
                                 route(route).
                         // ... stopping when we're closer than 4 meters to the destination
                                 // change this later
-                                distanceToGoalThreshold(4).
+                                distanceToGoalThreshold(5).
                         // ... or we're farther away than 10 meters from the route
-                                outsideRouteThreshold(5).
+                                outsideRouteThreshold(8).
                         // Low quality locations will not be taken into account when updating the navigation state
                                 ignoreLowQualityLocations(true).
                         // ... neither locations computed at unexpected floors if the user
@@ -872,14 +874,15 @@ public class ARActivity extends AppCompatActivity implements Scene.OnUpdateListe
             }
             else{
                 binding.distanceleftText.setText(String.valueOf(navigationProgress.getDistanceToGoal())
-                        .substring(0, 3) + "M");
+                        .substring(0, 3) + "I");
             }
+            boolean distanceLeftTrue = (int) navigationProgress.getDistanceToGoal()<8;
 
             binding.timeleftText.setText(String.valueOf(navigationProgress.getTimeToGoal()));
+         //   Toast.makeText(ARActivity.this, String.valueOf(distanceLeftTrue), Toast.LENGTH_SHORT).show();
+            if(navigationProgress.getCurrentIndication()
+                    .toString().toLowerCase().contains("straight") && distanceLeftTrue) {
 
-            if(navigationProgress.getDistanceToGoal()<4f & navigationProgress.getCurrentIndication()
-                    .toString().toLowerCase().contains("ahead") || navigationProgress.getCurrentIndication()
-                    .toString().toLowerCase().contains("straight")) {
                 reachedPOI_=true;
             }
             else {
