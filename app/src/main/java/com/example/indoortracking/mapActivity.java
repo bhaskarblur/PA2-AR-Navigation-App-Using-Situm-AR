@@ -448,40 +448,42 @@ public class mapActivity extends AppCompatActivity implements OnMapReadyCallback
 
                 //current floor at which user is
               //  Toast.makeText(mapActivity.this, "Hello", Toast.LENGTH_SHORT).show();
-                if (!poiplaced) {
-                    SitumSdk.communicationManager().fetchBuildingInfo(buildingId, new es.situm.sdk.utils.Handler<BuildingInfo>() {
-                        @Override
-                        public void onSuccess(BuildingInfo buildingInfo) {
-                            for (Floor floor : buildingInfo.getFloors()) {
 
-                                if (floor.getIdentifier().equals(targetFloorId)) {
-                                    binding.buildingInfo.setText(buildingInfo.getBuilding().getName() + ", floor: " + floor.getName().toString());
-                                    binding.emrText.setText("There is an emergency in " + buildingInfo.getBuilding().getName() + " at floor " +
-                                            floor.getName() + ". Please choose the closest route to exit.");
-                                    coordinateConverter = new CoordinateConverter(buildingInfo.getBuilding().getDimensions(),
-                                            buildingInfo.getBuilding().getCenter(), buildingInfo.getBuilding().getRotation());
-                                    buildingInfo_ = buildingInfo;
-                                    FloorSelectorView floorSelectorView = findViewById(R.id.situm_floor_selector);
-                                    floorSelectorView.setFloorSelector(buildingInfo.getBuilding(), googleMap, targetFloorId);
-                                    getPoisUseCase = new GetPoisUseCase(buildingInfo.getBuilding());
-                                    getPois(googleMap);
-                                    poiplaced = true;
-                                    hideProgress();
+                if(!location.getFloorIdentifier().equals("-1")) {
+                    targetFloorId=location.getFloorIdentifier();
+
+                    if (!poiplaced) {
+                        SitumSdk.communicationManager().fetchBuildingInfo(buildingId, new es.situm.sdk.utils.Handler<BuildingInfo>() {
+                            @Override
+                            public void onSuccess(BuildingInfo buildingInfo) {
+                                for (Floor floor : buildingInfo.getFloors()) {
+
+                                    if (floor.getIdentifier().equals(targetFloorId)) {
+                                        binding.buildingInfo.setText(buildingInfo.getBuilding().getName() + ", floor: " + floor.getName().toString());
+                                        binding.emrText.setText("There is an emergency in " + buildingInfo.getBuilding().getName() + " at floor " +
+                                                floor.getName() + ". Please choose the closest route to exit.");
+                                        coordinateConverter = new CoordinateConverter(buildingInfo.getBuilding().getDimensions(),
+                                                buildingInfo.getBuilding().getCenter(), buildingInfo.getBuilding().getRotation());
+                                        buildingInfo_ = buildingInfo;
+                                        FloorSelectorView floorSelectorView = findViewById(R.id.situm_floor_selector);
+                                        floorSelectorView.setFloorSelector(buildingInfo.getBuilding(), googleMap, targetFloorId);
+                                        getPoisUseCase = new GetPoisUseCase(buildingInfo.getBuilding());
+                                        getPois(googleMap);
+                                        poiplaced = true;
+                                        hideProgress();
+
+                                    }
 
                                 }
 
                             }
 
-                        }
+                            @Override
+                            public void onFailure(Error error) {
 
-                        @Override
-                        public void onFailure(Error error) {
-
-                        }
-                    });
-                }
-                if(!location.getFloorIdentifier().equals("-1")) {
-                    targetFloorId=location.getFloorIdentifier();
+                            }
+                        });
+                    }
 
                     if (markerName != null) {
                         markerName.setPosition(latLng);
