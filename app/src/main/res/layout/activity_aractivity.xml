@@ -30,7 +30,6 @@
             android:layout_marginEnd="20dp"
             android:fontFamily="@font/montregular"
             android:lineHeight="26sp"
-            android:text="Poi Name"
             android:textAlignment="center"
             android:textColor="#fff"
             android:textSize="18sp"

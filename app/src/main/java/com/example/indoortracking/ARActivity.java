@@ -151,7 +151,7 @@ public class ARActivity extends AppCompatActivity{
         setupTTs();
         maybeEnableArButton();
         manageUI();
-       // fillbuildingData();
+        fillbuildingData();
 
 
         // We ask for location and BLE permissions
@@ -486,15 +486,17 @@ public class ARActivity extends AppCompatActivity{
     }
     private void fillbuildingData() {
         // get data from intent;
-        Intent intent=getIntent();
-        Bundle bundle= intent.getBundleExtra("POIdata");
-        if(bundle!=null) {
-            buildingId = bundle.getString("buildingId");
-            targetFloorId = bundle.getString("floorId");
-            POIid = bundle.getString("poiId");
-            String poiname= bundle.getString("poiName");
-            binding.poiText.setText(poiname);
-            targetCoordinate = new Coordinate(bundle.getDouble("PoicoordinateX"), bundle.getDouble("PoicoordinateY"));
+        if(getIntent()!=null) {
+            Intent intent = getIntent();
+            Bundle bundle = intent.getBundleExtra("POIdata");
+            if (bundle != null) {
+                buildingId = bundle.getString("buildingId");
+                targetFloorId = bundle.getString("floorId");
+                POIid = bundle.getString("poiId");
+                String poiname = bundle.getString("poiName");
+                binding.poiText.setText(poiname);
+                targetCoordinate = new Coordinate(bundle.getDouble("PoicoordinateX"), bundle.getDouble("PoicoordinateY"));
+            }
         }
     }
 
@@ -789,7 +791,7 @@ public class ARActivity extends AppCompatActivity{
 
             //here assuming the walk speed at 1.5m/sec
             binding.timeleftText.setText(String.valueOf((navigationProgress.getTimeToGoal()/1.5)/60)
-                    .toString().substring(0, 3)+"min");
+                    .toString().substring(0, 4)+"min");
          //   Toast.makeText(ARActivity.this, String.valueOf(distanceLeftTrue), Toast.LENGTH_SHORT).show();
             if(navigationProgress.getCurrentIndication()
                     .toString().toLowerCase().contains("straight") && distanceLeftTrue) {

@@ -231,21 +231,22 @@ public class mapActivity extends AppCompatActivity implements OnMapReadyCallback
         googleMap.setOnMarkerClickListener(new GoogleMap.OnMarkerClickListener() {
             @Override
             public boolean onMarkerClick(@NonNull Marker marker) {
+                Marker marker1= marker;
                 Coordinate coordinate= new Coordinate(
-                        marker.getPosition().latitude, marker.getPosition()
+                        marker1.getPosition().latitude, marker1.getPosition()
                         .longitude);
                 showProgress();
                 binding.buttonsLayout.setVisibility(View.GONE);
-                showAllRoutes=true;
+               // showAllRoutes=true;
 
                 SitumSdk.communicationManager().fetchIndoorPOIsFromBuilding(buildingId, new es.situm.sdk.utils.Handler<Collection<Poi>>() {
                     @Override
                     public void onSuccess(Collection<Poi> pois) {
                         for(Poi poi:pois) {
-                            if(marker.getTitle().toString().equals(poi.getName())) {
+                            if(marker1.getTitle().toString().equals(poi.getName())) {
 
-                                selectedCoordinateX=String.valueOf(marker.getPosition().latitude);
-                                selectedCoordinateY=String.valueOf(marker.getPosition().longitude);
+                                selectedCoordinateX=String.valueOf(marker1.getPosition().latitude);
+                                selectedCoordinateY=String.valueOf(marker1.getPosition().longitude);
                                 selectedPoiId= poi.getIdentifier();
                                 selectedPoiName= poi.getName().toString();
                                 CartesianCoordinate cartesianCoordinate = coordinateConverter.toCartesianCoordinate(coordinate);
@@ -329,6 +330,7 @@ public class mapActivity extends AppCompatActivity implements OnMapReadyCallback
                     NavigationRequest navigationRequest = new NavigationRequest.Builder().
                             // Navigation will take place along this route
                                     route(route).
+                            distanceToChangeIndicationThreshold(2).
                             // ... stopping when we're closer than 4 meters to the destination
                                     distanceToGoalThreshold(4).
                             // ... or we're farther away than 10 meters from the route
@@ -365,7 +367,7 @@ public class mapActivity extends AppCompatActivity implements OnMapReadyCallback
                 builder.setNeutralButton("Ok", new DialogInterface.OnClickListener() {
                     @Override
                     public void onClick(DialogInterface dialogInterface, int i) {
-                        showAllRoutes=false;
+                        showAllRoutes=true;
 
 
                     }
@@ -485,25 +487,26 @@ public class mapActivity extends AppCompatActivity implements OnMapReadyCallback
                         });
                     }
 
-                    if (markerName != null) {
-                        markerName.setPosition(latLng);
-                        markerName.setRotation((float) location.getBearing().degrees());
-                    } else {
-                        Bitmap icon = BitmapFactory.decodeResource(getResources(),
-                                R.drawable.arrow_user);
-                        LatLngBounds.Builder builder = new LatLngBounds.Builder();
-
-                        MarkerOptions markerOptions = new MarkerOptions()
-                                .position(latLng)
-                                .title("You");
-
-                        markerOptions.icon(BitmapDescriptorFactory.fromBitmap(icon));
-                        markerOptions.draggable(false);
-                        markerName = googleMap.addMarker(new MarkerOptions().position(latLng).title("Title")
-                                .icon(BitmapDescriptorFactory.fromBitmap(icon))
-                                .draggable(false));
-                    }
-                    googleMap.animateCamera(CameraUpdateFactory.newLatLngZoom(latLng, 25));
+//                    if (markerName != null) {
+//                        markerName.setPosition(latLng);
+//                        markerName.setRotation((float) location.getBearing().degrees());
+//                    }
+//                    else {
+//                        Bitmap icon = BitmapFactory.decodeResource(getResources(),
+//                                R.drawable.arrow_user);
+//                        LatLngBounds.Builder builder = new LatLngBounds.Builder();
+//
+//                        MarkerOptions markerOptions = new MarkerOptions()
+//                                .position(latLng)
+//                                .title("You");
+//
+//                        markerOptions.icon(BitmapDescriptorFactory.fromBitmap(icon));
+//                        markerOptions.draggable(false);
+//                        markerName = googleMap.addMarker(new MarkerOptions().position(latLng).title("Title")
+//                                .icon(BitmapDescriptorFactory.fromBitmap(icon))
+//                                .draggable(false));
+//                    }
+//                    googleMap.animateCamera(CameraUpdateFactory.newLatLngZoom(latLng, 25));
                     hideProgress();
 
                     SitumSdk.communicationManager().fetchIndoorPOIsFromBuilding(buildingId, new es.situm.sdk.utils.Handler<Collection<Poi>>() {
@@ -513,7 +516,7 @@ public class mapActivity extends AppCompatActivity implements OnMapReadyCallback
                                 if (poi.getFloorIdentifier().equals(targetFloorId)) {
                                     if (latLng != null) {
                                         if (showAllRoutes) {
-                                            removePolylines();
+                                          //  removePolylines();
                                             calculateRoute(markerName.getPosition(), poi.getCoordinate(), poi.getCartesianCoordinate());
                                         } else {
                                             if (isNavigating) {
@@ -539,6 +542,27 @@ public class mapActivity extends AppCompatActivity implements OnMapReadyCallback
                 else {
                     showProgress();
                 }
+
+                if (markerName != null) {
+                    markerName.setPosition(latLng);
+                    markerName.setRotation((float) location.getBearing().degrees());
+                }
+                else {
+                    Bitmap icon = BitmapFactory.decodeResource(getResources(),
+                            R.drawable.arrow_user);
+                    LatLngBounds.Builder builder = new LatLngBounds.Builder();
+
+                    MarkerOptions markerOptions = new MarkerOptions()
+                            .position(latLng)
+                            .title("You");
+
+                    markerOptions.icon(BitmapDescriptorFactory.fromBitmap(icon));
+                    markerOptions.draggable(false);
+                    markerName = googleMap.addMarker(new MarkerOptions().position(latLng).title("Title")
+                            .icon(BitmapDescriptorFactory.fromBitmap(icon))
+                            .draggable(false));
+                }
+                googleMap.animateCamera(CameraUpdateFactory.newLatLngZoom(latLng, 25));
             }
 
 
@@ -727,6 +751,7 @@ public class mapActivity extends AppCompatActivity implements OnMapReadyCallback
         SitumSdk.directionsManager().requestDirections(directionsRequest, new es.situm.sdk.utils.Handler<Route>() {
             @Override
             public void onSuccess(Route route) {
+                removePolylines();
                 drawRoute(route);
                 centerCamera(route);
                 hideProgress();

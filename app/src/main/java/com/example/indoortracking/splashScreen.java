@@ -60,7 +60,7 @@ public class splashScreen extends AppCompatActivity {
         new Handler().postDelayed(new Runnable() {
             @Override
             public void run() {
-                startActivity(new Intent(splashScreen.this, ARActivity.class));
+                startActivity(new Intent(splashScreen.this, mapActivity.class));
                 finish();
                 overridePendingTransition(R.anim.slide_in_left,R.anim.slide_out_left);
             }
@@ -131,7 +131,7 @@ public class splashScreen extends AppCompatActivity {
                     new Handler().postDelayed(new Runnable() {
                         @Override
                         public void run() {
-                            startActivity(new Intent(splashScreen.this, ARActivity.class));
+                            startActivity(new Intent(splashScreen.this, mapActivity.class));
                             finish();
                             overridePendingTransition(R.anim.slide_in_left,R.anim.slide_out_left);
                         }
