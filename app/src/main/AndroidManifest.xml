@@ -2,6 +2,8 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
 
+    <uses-sdk android:minSdkVersion="24" />
+
     <uses-feature android:name="android.hardware.camera.ar" />
 
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
@@ -29,12 +31,13 @@
         android:required="true" />
 
     <uses-permission android:name="android.permission.CAMERA" />
-<uses-sdk android:minSdkVersion="24"/>
+
     <queries>
         <intent>
             <action android:name="android.intent.action.TTS_SERVICE" />
         </intent>
     </queries>
+
     <application
         android:allowBackup="true"
         android:dataExtractionRules="@xml/data_extraction_rules"
@@ -47,6 +50,9 @@
         tools:node="merge"
         tools:targetApi="31">
         <activity
+            android:name=".settingsActivity"
+            android:exported="false" />
+        <activity
             android:name=".assets.MainActivity"
             android:exported="false" />
 
@@ -57,8 +63,7 @@
 
         <activity
             android:name=".ARActivity"
-            android:exported="false" >
-        </activity>
+            android:exported="false"></activity>
 
         <meta-data
             android:name="es.situm.sdk.API_USER"
@@ -72,10 +77,10 @@
         <meta-data
             android:name="com.google.ar.core"
             android:value="required" />
-
         <meta-data
             android:name="com.google.android.ar.API_KEY"
-            android:value="AIzaSyBOrhG7x-VeAoUivTteQ9RvDvufoerV2MM"/>
+            android:value="AIzaSyBOrhG7x-VeAoUivTteQ9RvDvufoerV2MM" />
+
         <activity
             android:name=".mapActivity"
             android:exported="false" />

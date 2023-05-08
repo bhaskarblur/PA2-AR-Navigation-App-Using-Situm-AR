@@ -2,13 +2,17 @@ package com.example.indoortracking;
 
 import static android.content.ContentValues.TAG;
 
+import static java.security.AccessController.getContext;
+
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.core.content.ContextCompat;
 
 import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.IntentSender;
+import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.content.pm.ResolveInfo;
 import android.graphics.Bitmap;
@@ -38,17 +42,22 @@ import com.google.android.gms.maps.OnMapReadyCallback;
 import com.google.android.gms.maps.SupportMapFragment;
 import com.google.android.gms.maps.model.BitmapDescriptorFactory;
 import com.google.android.gms.maps.model.Circle;
+import com.google.android.gms.maps.model.Dash;
+import com.google.android.gms.maps.model.Dot;
+import com.google.android.gms.maps.model.Gap;
 import com.google.android.gms.maps.model.LatLng;
 import com.google.android.gms.maps.model.LatLngBounds;
 import com.google.android.gms.maps.model.MapStyleOptions;
 import com.google.android.gms.maps.model.Marker;
 import com.google.android.gms.maps.model.MarkerOptions;
+import com.google.android.gms.maps.model.PatternItem;
 import com.google.android.gms.maps.model.Polyline;
 import com.google.android.gms.maps.model.PolylineOptions;
 import com.google.android.gms.tasks.OnCompleteListener;
 import com.google.android.gms.tasks.Task;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
@@ -117,21 +126,38 @@ public class mapActivity extends AppCompatActivity implements OnMapReadyCallback
     private int TTS_CHECK_CODE=111;
     private TextToSpeech tts;
     private Marker markerName;
-
+    private SharedPreferences sharedPreferences;
+    int routeColor;
+    int navColor;
+    boolean voice;
+    int lineType;
+    public static final int PATTERN_DASH_LENGTH_PX = 20;
+    public static final int PATTERN_GAP_LENGTH_PX = 20;
+    public static final PatternItem DOT = new Dot();
+    public static final PatternItem DASH = new Dash(PATTERN_DASH_LENGTH_PX);
+    public static final PatternItem GAP = new Gap(PATTERN_GAP_LENGTH_PX);
+    public static final List<PatternItem> PATTERN_POLYGON_ALPHA = Arrays.asList(GAP, DASH);
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         binding = ActivityMapBinding.inflate(getLayoutInflater());
         setContentView(binding.getRoot());
         commons = new commons();
+        sharedPreferences= getSharedPreferences("settings", MODE_PRIVATE);
+        routeColor=sharedPreferences.getInt("routeColor",0);
+        navColor=sharedPreferences.getInt("navColor",0);
+        voice=sharedPreferences.getBoolean("voice", true);
+        lineType=sharedPreferences.getInt("lineType", 0);
         enableLoc();
         SitumSdk.init(mapActivity.this);
       //  loadMap();
         load_map2();
         setupTTs();
 
-
     }
+
+
+
     private void setupTTs() {
         PackageManager pm = getPackageManager();
         Intent installIntent = new Intent();
@@ -172,25 +198,35 @@ public class mapActivity extends AppCompatActivity implements OnMapReadyCallback
     }
 
     private void speakTTs(String text) {
-        if(!tts.isSpeaking()) {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-                Log.d(TAG, "Speak new API");
+        if(voice) {
+            if (!tts.isSpeaking()) {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+                    Log.d(TAG, "Speak new API");
 
-                Bundle bundle = new Bundle();
-                bundle.putInt(TextToSpeech.Engine.KEY_PARAM_STREAM, AudioManager.STREAM_MUSIC);
-                tts.speak(text, TextToSpeech.QUEUE_FLUSH, bundle, "1");
-            } else {
-                Log.d(TAG, "Speak old API");
-                HashMap<String, String> param = new HashMap<>();
-                param.put(TextToSpeech.Engine.KEY_PARAM_STREAM, String.valueOf(AudioManager.STREAM_MUSIC));
-                tts.speak(text, TextToSpeech.QUEUE_FLUSH, param);
+                    Bundle bundle = new Bundle();
+                    bundle.putInt(TextToSpeech.Engine.KEY_PARAM_STREAM, AudioManager.STREAM_MUSIC);
+                    tts.speak(text, TextToSpeech.QUEUE_FLUSH, bundle, "1");
+                } else {
+                    Log.d(TAG, "Speak old API");
+                    HashMap<String, String> param = new HashMap<>();
+                    param.put(TextToSpeech.Engine.KEY_PARAM_STREAM, String.valueOf(AudioManager.STREAM_MUSIC));
+                    tts.speak(text, TextToSpeech.QUEUE_FLUSH, param);
+
+                }
 
             }
-
         }
 
     }
     private void manageLogic() {
+
+        binding.settingsButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                startActivity(new Intent(mapActivity.this, settingsActivity.class));
+                overridePendingTransition(R.anim.slide_in_left, R.anim.slide_out_left);
+            }
+        });
         binding.arCamButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
@@ -217,6 +253,7 @@ public class mapActivity extends AppCompatActivity implements OnMapReadyCallback
                 clearMap();
                 binding.buttonsLayout.setVisibility(View.GONE);
                 showAllRoutes=true;
+                isNavigating = false;
                 poiplaced=false;
 
             }
@@ -239,6 +276,7 @@ public class mapActivity extends AppCompatActivity implements OnMapReadyCallback
                 binding.buttonsLayout.setVisibility(View.GONE);
                // showAllRoutes=true;
 
+
                 SitumSdk.communicationManager().fetchIndoorPOIsFromBuilding(buildingId, new es.situm.sdk.utils.Handler<Collection<Poi>>() {
                     @Override
                     public void onSuccess(Collection<Poi> pois) {
@@ -252,9 +290,10 @@ public class mapActivity extends AppCompatActivity implements OnMapReadyCallback
                                 CartesianCoordinate cartesianCoordinate = coordinateConverter.toCartesianCoordinate(coordinate);
                                 //Toast.makeText(mapActivity.this, marker.getTitle(), Toast.LENGTH_SHORT).show();
                                 targetCoordinate= coordinate;
-                                clearMap();
+                                isNavigating = false;
                                 arrived=false;
                                 showAllRoutes=false;
+                                removePolylines();
                                // Toast.makeText(mapActivity.this, "switched to single", Toast.LENGTH_SHORT).show();
                                 binding.buttonsLayout.setVisibility(View.VISIBLE);
                                 // Navigate the user now, use navigation start and listener.
@@ -332,7 +371,7 @@ public class mapActivity extends AppCompatActivity implements OnMapReadyCallback
                                     route(route).
                             distanceToChangeIndicationThreshold(2).
                             // ... stopping when we're closer than 4 meters to the destination
-                                    distanceToGoalThreshold(4).
+                                    distanceToGoalThreshold(7).
                             // ... or we're farther away than 10 meters from the route
                                     outsideRouteThreshold(5).
                             // Low quality locations will not be taken into account when updating the navigation state
@@ -392,6 +431,7 @@ public class mapActivity extends AppCompatActivity implements OnMapReadyCallback
                  //       navigationProgress.getClosestLocationInRoute().getFloorIdentifier(), Toast.LENGTH_SHORT).show();
                 Log.i(TAG, "Route advances");
                 hideProgress();
+                speakTTs(navigationProgress.getNextIndication().toText(mapActivity.this));
                 Toast.makeText(mapActivity.this, navigationProgress.getCurrentIndication().toText(mapActivity.this), Toast.LENGTH_SHORT).show();
                 //   FloorSelectorView floorSelectorView = findViewById(R.id.situm_floor_selector);
                 //  floorSelectorView.setFloorSelector(buildingInfo_.getBuilding(), googleMap, targetFloorId);
@@ -472,6 +512,36 @@ public class mapActivity extends AppCompatActivity implements OnMapReadyCallback
                                         getPoisUseCase = new GetPoisUseCase(buildingInfo.getBuilding());
                                         getPois(googleMap);
                                         poiplaced = true;
+                                        SitumSdk.communicationManager().fetchIndoorPOIsFromBuilding(buildingId, new es.situm.sdk.utils.Handler<Collection<Poi>>() {
+                                            @Override
+                                            public void onSuccess(Collection<Poi> pois) {
+                                                for (Poi poi : pois) {
+                                                    if (poi.getFloorIdentifier().equals(targetFloorId)) {
+                                                        if (latLng != null) {
+                                                            if (showAllRoutes) {
+                                                                removePolylines();
+                                                                calculateRoute(markerName.getPosition(), poi.getCoordinate(), poi.getCartesianCoordinate());
+                                                            } else {
+                                                                if (isNavigating) {
+                                                                    SitumSdk.navigationManager().updateWithLocation(location);
+
+                                                                } else {
+                                                                    removePolylines();
+                                                                    startNavigation(location);
+                                                                }
+                                                            }
+                                                        }
+                                                    }
+                                                }
+
+                                            }
+
+                                            @Override
+                                            public void onFailure(Error error) {
+
+                                            }
+                                        });
+
                                         hideProgress();
 
                                     }
@@ -507,7 +577,6 @@ public class mapActivity extends AppCompatActivity implements OnMapReadyCallback
 //                                .draggable(false));
 //                    }
 //                    googleMap.animateCamera(CameraUpdateFactory.newLatLngZoom(latLng, 25));
-                    hideProgress();
 
                     SitumSdk.communicationManager().fetchIndoorPOIsFromBuilding(buildingId, new es.situm.sdk.utils.Handler<Collection<Poi>>() {
                         @Override
@@ -516,7 +585,7 @@ public class mapActivity extends AppCompatActivity implements OnMapReadyCallback
                                 if (poi.getFloorIdentifier().equals(targetFloorId)) {
                                     if (latLng != null) {
                                         if (showAllRoutes) {
-                                          //  removePolylines();
+                                            removePolylines();
                                             calculateRoute(markerName.getPosition(), poi.getCoordinate(), poi.getCartesianCoordinate());
                                         } else {
                                             if (isNavigating) {
@@ -751,7 +820,7 @@ public class mapActivity extends AppCompatActivity implements OnMapReadyCallback
         SitumSdk.directionsManager().requestDirections(directionsRequest, new es.situm.sdk.utils.Handler<Route>() {
             @Override
             public void onSuccess(Route route) {
-                removePolylines();
+
                 drawRoute(route);
                 centerCamera(route);
                 hideProgress();
@@ -821,12 +890,83 @@ public class mapActivity extends AppCompatActivity implements OnMapReadyCallback
                 latLngs.add(new LatLng(point.getCoordinate().getLatitude(), point.getCoordinate().getLongitude()));
             }
 
-            PolylineOptions polyLineOptions = new PolylineOptions()
-                    .color(getResources().getColor(es.situm.components.R.color.situm_red))
-                    .width(12f)
-                    .clickable(true)
-                    .addAll(latLngs);
-            polylines.add(googleMap.addPolyline(polyLineOptions));
+            if(navColor==1) {
+                if(lineType==1) {
+                    PolylineOptions polyOptions = new PolylineOptions();
+                    polyOptions.color(ContextCompat.getColor(mapActivity.this, R.color.blue));
+                    polyOptions.addAll(latLngs);
+                    polyOptions.width(12f);
+                    polyOptions.pattern(PATTERN_POLYGON_ALPHA);
+                    Polyline polyline = googleMap.addPolyline(polyOptions);
+                    polylines.add(googleMap.addPolyline(polyOptions));
+                }
+                else {
+                    PolylineOptions polyLineOptions = new PolylineOptions()
+                            .color(getResources().getColor(R.color.blue))
+                            .width(12f)
+                            .clickable(true)
+                            .addAll(latLngs);
+                    polylines.add(googleMap.addPolyline(polyLineOptions));
+                }
+            }
+            else if(navColor==2) {
+                if(lineType==1) {
+                    PolylineOptions polyOptions = new PolylineOptions();
+                    polyOptions.color(ContextCompat.getColor(mapActivity.this, R.color.green));
+                    polyOptions.addAll(latLngs);
+                    polyOptions.width(12f);
+                    polyOptions.pattern(PATTERN_POLYGON_ALPHA);
+                    Polyline polyline = googleMap.addPolyline(polyOptions);
+                    polylines.add(googleMap.addPolyline(polyOptions));
+                }
+                else {
+                    PolylineOptions polyLineOptions = new PolylineOptions()
+                            .color(getResources().getColor(R.color.green))
+                            .width(12f)
+                            .clickable(true)
+                            .addAll(latLngs);
+                    polylines.add(googleMap.addPolyline(polyLineOptions));
+                }
+            }
+            else if(navColor==3) {
+                if(lineType==1) {
+                    PolylineOptions polyOptions = new PolylineOptions();
+                    polyOptions.color(ContextCompat.getColor(mapActivity.this, R.color.black));
+                    polyOptions.addAll(latLngs);
+                    polyOptions.width(12f);
+                    polyOptions.pattern(PATTERN_POLYGON_ALPHA);
+                    Polyline polyline = googleMap.addPolyline(polyOptions);
+                    polylines.add(googleMap.addPolyline(polyOptions));
+                }
+                else {
+                    PolylineOptions polyLineOptions = new PolylineOptions()
+                            .color(getResources().getColor(R.color.black))
+                            .width(12f)
+                            .clickable(true)
+                            .addAll(latLngs);
+                    polylines.add(googleMap.addPolyline(polyLineOptions));
+                }
+            }
+            else {
+                if(lineType==1) {
+                    PolylineOptions polyOptions = new PolylineOptions();
+                    polyOptions.color(ContextCompat.getColor(mapActivity.this, R.color.redPrimary));
+                    polyOptions.addAll(latLngs);
+                    polyOptions.width(12f);
+                    polyOptions.pattern(PATTERN_POLYGON_ALPHA);
+                    Polyline polyline = googleMap.addPolyline(polyOptions);
+                    polylines.add(googleMap.addPolyline(polyOptions));
+                }
+                else {
+                    PolylineOptions polyLineOptions = new PolylineOptions()
+                            .color(getResources().getColor(R.color.redPrimary))
+                            .width(12f)
+                            .clickable(true)
+                            .addAll(latLngs);
+                    polylines.add(googleMap.addPolyline(polyLineOptions));
+                }
+            }
+
         }
     }
     private void drawRoute(Route route) {
@@ -838,11 +978,82 @@ public class mapActivity extends AppCompatActivity implements OnMapReadyCallback
                 latLngs.add(new LatLng(point.getCoordinate().getLatitude(), point.getCoordinate().getLongitude()));
             }
 
-            PolylineOptions polyLineOptions = new PolylineOptions()
-                    .color(getResources().getColor(es.situm.components.R.color.situm_dark_gray))
-                    .width(12f)
-                    .addAll(latLngs);
-            polylines.add(googleMap.addPolyline(polyLineOptions));
+            if(routeColor==1) {
+                if(lineType==1) {
+                    PolylineOptions polyOptions = new PolylineOptions();
+                    polyOptions.color(ContextCompat.getColor(mapActivity.this, R.color.blue));
+                    polyOptions.addAll(latLngs);
+                    polyOptions.width(12f);
+                    polyOptions.pattern(PATTERN_POLYGON_ALPHA);
+                    Polyline polyline = googleMap.addPolyline(polyOptions);
+                    polylines.add(googleMap.addPolyline(polyOptions));
+                }
+                else {
+                    PolylineOptions polyLineOptions = new PolylineOptions()
+                            .color(getResources().getColor(R.color.blue))
+                            .width(12f)
+                            .clickable(true)
+                            .addAll(latLngs);
+                    polylines.add(googleMap.addPolyline(polyLineOptions));
+                }
+            }
+            else if(routeColor==2) {
+                if(lineType==1) {
+                    PolylineOptions polyOptions = new PolylineOptions();
+                    polyOptions.color(ContextCompat.getColor(mapActivity.this, R.color.green));
+                    polyOptions.addAll(latLngs);
+                    polyOptions.width(12f);
+                    polyOptions.pattern(PATTERN_POLYGON_ALPHA);
+                    Polyline polyline = googleMap.addPolyline(polyOptions);
+                    polylines.add(googleMap.addPolyline(polyOptions));
+                }
+                else {
+                    PolylineOptions polyLineOptions = new PolylineOptions()
+                            .color(getResources().getColor(R.color.green))
+                            .width(12f)
+                            .clickable(true)
+                            .addAll(latLngs);
+                    polylines.add(googleMap.addPolyline(polyLineOptions));
+                }
+            }
+            else if(routeColor==0) {
+                if(lineType==1) {
+                    PolylineOptions polyOptions = new PolylineOptions();
+                    polyOptions.color(ContextCompat.getColor(mapActivity.this, R.color.redPrimary));
+                    polyOptions.addAll(latLngs);
+                    polyOptions.width(12f);
+                    polyOptions.pattern(PATTERN_POLYGON_ALPHA);
+                    Polyline polyline = googleMap.addPolyline(polyOptions);
+                    polylines.add(googleMap.addPolyline(polyOptions));
+                }
+                else {
+                    PolylineOptions polyLineOptions = new PolylineOptions()
+                            .color(getResources().getColor(R.color.redPrimary))
+                            .width(12f)
+                            .clickable(true)
+                            .addAll(latLngs);
+                    polylines.add(googleMap.addPolyline(polyLineOptions));
+                }
+            }
+            else {
+                if(lineType==1) {
+                    PolylineOptions polyOptions = new PolylineOptions();
+                    polyOptions.color(ContextCompat.getColor(mapActivity.this, R.color.black));
+                    polyOptions.addAll(latLngs);
+                    polyOptions.width(12f);
+                    polyOptions.pattern(PATTERN_POLYGON_ALPHA);
+                    Polyline polyline = googleMap.addPolyline(polyOptions);
+                    polylines.add(googleMap.addPolyline(polyOptions));
+                }
+                else {
+                    PolylineOptions polyLineOptions = new PolylineOptions()
+                            .color(getResources().getColor(R.color.black))
+                            .width(12f)
+                            .clickable(true)
+                            .addAll(latLngs);
+                    polylines.add(googleMap.addPolyline(polyLineOptions));
+                }
+            }
         }
     }
 
@@ -862,6 +1073,12 @@ public class mapActivity extends AppCompatActivity implements OnMapReadyCallback
         if(locationManager!=null) {
             startLocation();
         }
+        if(sharedPreferences!=null) {
+            routeColor = sharedPreferences.getInt("routeColor", 0);
+            navColor = sharedPreferences.getInt("navColor", 0);
+            voice = sharedPreferences.getBoolean("voice", true);
+            lineType=sharedPreferences.getInt("lineType", 0);
+        }
 
     }
 
@@ -873,5 +1090,6 @@ public class mapActivity extends AppCompatActivity implements OnMapReadyCallback
         SitumSdk.navigationManager().removeUpdates();
         super.finish();
     }
+
 }
 

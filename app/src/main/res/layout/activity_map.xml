@@ -55,8 +55,8 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:background="#F1F1F1"
-        android:visibility="gone"
         android:backgroundTint="#F1F1F1"
+        android:visibility="gone"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="parent">
@@ -208,5 +208,17 @@
 
         </androidx.constraintlayout.widget.ConstraintLayout>
     </androidx.constraintlayout.widget.ConstraintLayout>
+
+    <ImageView
+        android:id="@+id/settingsButton"
+        android:layout_width="28dp"
+        android:layout_height="28dp"
+        android:layout_marginTop="20dp"
+        android:layout_marginEnd="20dp"
+        android:clickable="true"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintTop_toBottomOf="@+id/emr_layout"
+        app:srcCompat="@drawable/ic_settings"
+        app:tint="@color/black" />
 
 </androidx.constraintlayout.widget.ConstraintLayout>

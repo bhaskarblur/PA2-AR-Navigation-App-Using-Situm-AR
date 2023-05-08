@@ -25,6 +25,7 @@ import android.Manifest;
 import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.content.pm.ResolveInfo;
 import android.graphics.Bitmap;
@@ -142,12 +143,16 @@ public class ARActivity extends AppCompatActivity{
     private LatLng currentLatLng;
     private List<LatLng> routeNav= new ArrayList<>();
     private boolean routeIterated=false;
+    private SharedPreferences sharedPreferences;
+    boolean voice;
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         binding = ActivityAractivityBinding.inflate(getLayoutInflater());
         setContentView(binding.getRoot());
         SitumSdk.init(this);
+        sharedPreferences= getSharedPreferences("settings", MODE_PRIVATE);
+        voice=sharedPreferences.getBoolean("voice", true);
         setupTTs();
         maybeEnableArButton();
         manageUI();
@@ -466,6 +471,7 @@ public class ARActivity extends AppCompatActivity{
     }
 
     private void speakTTs(String text) {
+        if(voice) {
         if(!tts.isSpeaking()) {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
                 Log.d(TAG, "Speak new API");
@@ -480,8 +486,10 @@ public class ARActivity extends AppCompatActivity{
                 tts.speak(text, TextToSpeech.QUEUE_FLUSH, param);
 
             }
-
         }
+        }
+
+
 
     }
     private void fillbuildingData() {
@@ -776,8 +784,8 @@ public class ARActivity extends AppCompatActivity{
             //binding.arrow2d.setVisibility(View.VISIBLE);
             binding.statusText.setText("Follow the route.");
             binding.progressBar.setVisibility(View.GONE);
-            navigationProgress.getNextIndication().getIndicationType().toString();
             Log.d("current indication", navigationProgress.getCurrentIndication().toString());
+            speakTTs(navigationProgress.getNextIndication().toText(ARActivity.this));
 
             if(String.valueOf(navigationProgress.getDistanceToClosestPointInRoute()).toString().length()>5) {
                 binding.distanceleftText.setText(String.valueOf(navigationProgress.getDistanceToGoal() * 3.281)

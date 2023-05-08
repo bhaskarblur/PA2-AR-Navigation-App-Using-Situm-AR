@@ -14,4 +14,6 @@
     <color name="situm_secondary_color">#e6e8f5</color>
     <color name="situm_primary_color">#283380</color>
     <color name="redPrimary">#FB0101</color>
+    <color name="blue">#ff0099cc</color>
+    <color name="green">#33CC00</color>
 </resources>

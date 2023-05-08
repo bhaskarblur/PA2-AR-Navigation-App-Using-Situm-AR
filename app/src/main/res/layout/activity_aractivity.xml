@@ -4,6 +4,7 @@
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
+    android:background="@color/white"
     tools:context=".ARActivity">
 
     <fragment
@@ -45,10 +46,10 @@
             android:layout_height="32dp"
             android:layout_marginStart="20dp"
             android:layout_marginTop="20dp"
-            app:tint="#fff"
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintTop_toTopOf="parent"
-            app:srcCompat="@drawable/close_icon" />
+            app:srcCompat="@drawable/close_icon"
+            app:tint="#fff" />
 
         <androidx.constraintlayout.widget.ConstraintLayout
             android:id="@+id/constraintLayout5"
