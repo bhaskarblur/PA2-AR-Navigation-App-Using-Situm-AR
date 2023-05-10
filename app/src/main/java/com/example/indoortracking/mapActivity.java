@@ -92,9 +92,9 @@ public class mapActivity extends AppCompatActivity implements OnMapReadyCallback
     private SitumMapsLibrary mapsLibrary = null;
     private LibrarySettings librarySettings;
     private SitumMapView mapsView=null;
-    private String buildingId = "13347";
+    private String buildingId = "13347"; //13347  -  9640
     private String targetFloorId = "42059";
-    private String EmrFloorId = "42059";
+
     private String selectedPoiName;
     // 42059
     private Boolean routesFound=false;
@@ -137,6 +137,8 @@ public class mapActivity extends AppCompatActivity implements OnMapReadyCallback
     public static final PatternItem DASH = new Dash(PATTERN_DASH_LENGTH_PX);
     public static final PatternItem GAP = new Gap(PATTERN_GAP_LENGTH_PX);
     public static final List<PatternItem> PATTERN_POLYGON_ALPHA = Arrays.asList(GAP, DASH);
+    private Boolean NotoutsideRoute=true;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -371,9 +373,9 @@ public class mapActivity extends AppCompatActivity implements OnMapReadyCallback
                                     route(route).
                             distanceToChangeIndicationThreshold(2).
                             // ... stopping when we're closer than 4 meters to the destination
-                                    distanceToGoalThreshold(7).
+                                    distanceToGoalThreshold(3).
                             // ... or we're farther away than 10 meters from the route
-                                    outsideRouteThreshold(5).
+                                    outsideRouteThreshold(3).
                             // Low quality locations will not be taken into account when updating the navigation state
                                     ignoreLowQualityLocations(true).
                             // ... neither locations computed at unexpected floors if the user
@@ -431,6 +433,7 @@ public class mapActivity extends AppCompatActivity implements OnMapReadyCallback
                  //       navigationProgress.getClosestLocationInRoute().getFloorIdentifier(), Toast.LENGTH_SHORT).show();
                 Log.i(TAG, "Route advances");
                 hideProgress();
+                NotoutsideRoute=true;
                 speakTTs(navigationProgress.getNextIndication().toText(mapActivity.this));
                 Toast.makeText(mapActivity.this, navigationProgress.getCurrentIndication().toText(mapActivity.this), Toast.LENGTH_SHORT).show();
                 //   FloorSelectorView floorSelectorView = findViewById(R.id.situm_floor_selector);
@@ -468,9 +471,22 @@ public class mapActivity extends AppCompatActivity implements OnMapReadyCallback
 
         @Override
         public void onUserOutsideRoute() {
+            AlertDialog.Builder builder = new AlertDialog.Builder(mapActivity.this);
+            if(NotoutsideRoute) {
+            builder.setNeutralButton("Ok", new DialogInterface.OnClickListener() {
+                @Override
+                public void onClick(DialogInterface dialogInterface, int i) {
+
+
+                }
+            });
+            builder.setTitle("Outside Route!");
+            builder.setMessage("You're going outside route. Follow the route").show();
             Toast.makeText(mapActivity.this, "You are going outside the route", Toast.LENGTH_SHORT).show();
             isNavigating = false;
+            NotoutsideRoute=false;
             SitumSdk.navigationManager().removeUpdates();
+        }
         }
     };
 
@@ -637,17 +653,22 @@ public class mapActivity extends AppCompatActivity implements OnMapReadyCallback
 
             @Override
             public void onStatusChanged(@NonNull LocationStatus locationStatus) {
+                Log.d("Location Status", "Status Changed: "+locationStatus.toString());
             }
 
             @Override
             public void onError(@NonNull Error error) {
+                Toast.makeText(mapActivity.this, "Error: "+error.getMessage(), Toast.LENGTH_SHORT).show();
             }
         };
-        LocationRequest locationRequest = new LocationRequest.Builder()
-                .useWifi(true)
-                .useBle(true)
-                .useDeadReckoning(true)
-                .useForegroundService(true)
+        LocationRequest locationRequest = new LocationRequest.Builder().
+                useWifi(true)
+                .useBle(true).
+                useGps(true).
+               // buildingIdentifier(buildingId).
+                useBatterySaver(true).
+                useDeadReckoning(true)
+                .useForegroundService(false)
                 .build();
         locationManager.requestLocationUpdates(locationRequest, locationListener);
 

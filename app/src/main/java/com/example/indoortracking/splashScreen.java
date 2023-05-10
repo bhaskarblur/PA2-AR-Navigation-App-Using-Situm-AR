@@ -1,6 +1,5 @@
 package com.example.indoortracking;
 
-import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
@@ -15,7 +14,6 @@ import android.os.Handler;
 import android.speech.tts.TextToSpeech;
 import android.widget.Toast;
 
-import com.example.indoortracking.assets.MainActivity;
 import com.google.android.gms.common.api.ApiException;
 import com.google.android.gms.common.api.ResolvableApiException;
 import com.google.android.gms.location.LocationServices;
@@ -60,7 +58,7 @@ public class splashScreen extends AppCompatActivity {
         new Handler().postDelayed(new Runnable() {
             @Override
             public void run() {
-                startActivity(new Intent(splashScreen.this, mapActivity.class));
+                startActivity(new Intent(splashScreen.this, ARActivity.class));
                 finish();
                 overridePendingTransition(R.anim.slide_in_left,R.anim.slide_out_left);
             }
@@ -131,7 +129,7 @@ public class splashScreen extends AppCompatActivity {
                     new Handler().postDelayed(new Runnable() {
                         @Override
                         public void run() {
-                            startActivity(new Intent(splashScreen.this, mapActivity.class));
+                            startActivity(new Intent(splashScreen.this, ARActivity.class));
                             finish();
                             overridePendingTransition(R.anim.slide_in_left,R.anim.slide_out_left);
                         }
@@ -151,7 +149,7 @@ public class splashScreen extends AppCompatActivity {
                                 // and check the result in onActivityResult().
                                 resolvable.startResolutionForResult(
                                         splashScreen.this,
-                                        101);
+                                        1001);
 
                             } catch (IntentSender.SendIntentException e) {
                                 // Ignore the error.
@@ -232,6 +230,19 @@ public class splashScreen extends AppCompatActivity {
                     startActivity(installIntent);
                 }
 
+            }
+        }
+
+        if(requestCode==1001) {
+            if(resultCode==RESULT_OK) {
+                new Handler().postDelayed(new Runnable() {
+                    @Override
+                    public void run() {
+                        startActivity(new Intent(splashScreen.this, ARActivity.class));
+                        finish();
+                        overridePendingTransition(R.anim.slide_in_left,R.anim.slide_out_left);
+                    }
+                },1200);
             }
         }
     }

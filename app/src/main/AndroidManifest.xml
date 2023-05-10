@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:tools="http://schemas.android.com/tools">
+    xmlns:tools="http://schemas.android.com/tools"
+    package="com.example.indoortracking">
 
     <uses-sdk android:minSdkVersion="24" />
 
@@ -47,23 +48,9 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.IndoorTracking"
         android:usesCleartextTraffic="true"
+        tools:ignore="GoogleAppIndexingWarning"
         tools:node="merge"
         tools:targetApi="31">
-        <activity
-            android:name=".settingsActivity"
-            android:exported="false" />
-        <activity
-            android:name=".assets.MainActivity"
-            android:exported="false" />
-
-        <meta-data
-            android:name="com.google.ar.core"
-            android:value="required"
-            tools:replace="android:value" />
-
-        <activity
-            android:name=".ARActivity"
-            android:exported="false"></activity>
 
         <meta-data
             android:name="es.situm.sdk.API_USER"
@@ -73,13 +60,30 @@
             android:value="ef34e0a493c5eb6345a3513a7cb03cf6fb418ee6d10d865f3f7e3b7c050e3b57" />
         <meta-data
             android:name="com.google.android.geo.API_KEY"
-            android:value="AIzaSyBS4QH7KbXakdfJP8v1qErqT0iF9GRJbII" />
-        <meta-data
-            android:name="com.google.ar.core"
-            android:value="required" />
+            android:value="AIzaSyCfmwE5xNAlTWcrLVQFA8Yq6via4l9eVvU" />
+
         <meta-data
             android:name="com.google.android.ar.API_KEY"
-            android:value="AIzaSyBOrhG7x-VeAoUivTteQ9RvDvufoerV2MM" />
+            android:value="AIzaSyCfmwE5xNAlTWcrLVQFA8Yq6via4l9eVvU" />
+
+        <meta-data
+            android:name="com.google.ar.core"
+            android:value="required"
+            tools:replace="android:value" />
+
+        <meta-data
+            android:name="com.google.ar.core"
+            android:value="required"
+            tools:replace="android:value" />
+        <activity
+            android:name=".settingsActivity"
+            android:exported="false" />
+
+
+        <activity
+            android:name=".ARActivity"
+            android:exported="false"></activity>
+
 
         <activity
             android:name=".mapActivity"

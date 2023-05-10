@@ -1,6 +1,5 @@
 package com.example.indoortracking;
 
-import com.example.indoortracking.assets.MainActivity;
 import com.google.ar.core.Config;
 import com.google.ar.core.Session;
 import com.google.ar.sceneform.ux.ArFragment;
