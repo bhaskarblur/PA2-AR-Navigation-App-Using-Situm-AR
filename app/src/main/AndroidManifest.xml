@@ -66,6 +66,8 @@
             android:name="com.google.android.ar.API_KEY"
             android:value="AIzaSyCfmwE5xNAlTWcrLVQFA8Yq6via4l9eVvU" />
 
+
+
         <meta-data
             android:name="com.google.ar.core"
             android:value="required"
@@ -82,11 +84,14 @@
 
         <activity
             android:name=".ARActivity"
-            android:exported="false"></activity>
+            android:exported="false"
+            android:screenOrientation="portrait"
+            android:configChanges="orientation|screenSize"></activity>
 
 
         <activity
             android:name=".mapActivity"
+
             android:exported="false" />
         <activity
             android:name=".splashScreen"

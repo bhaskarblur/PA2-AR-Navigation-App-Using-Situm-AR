@@ -22,6 +22,13 @@ import com.google.android.gms.location.LocationSettingsResponse;
 import com.google.android.gms.location.LocationSettingsStatusCodes;
 import com.google.android.gms.tasks.OnCompleteListener;
 import com.google.android.gms.tasks.Task;
+import com.google.ar.core.Config;
+import com.google.ar.core.Earth;
+import com.google.ar.core.Session;
+import com.google.ar.core.exceptions.UnavailableApkTooOldException;
+import com.google.ar.core.exceptions.UnavailableArcoreNotInstalledException;
+import com.google.ar.core.exceptions.UnavailableDeviceNotCompatibleException;
+import com.google.ar.core.exceptions.UnavailableSdkTooOldException;
 
 import java.util.Locale;
 
@@ -29,14 +36,49 @@ public class splashScreen extends AppCompatActivity {
     private int TTS_CHECK_CODE=111;
     private TextToSpeech tts;
     private final int ACCESS_FINE_LOCATION_REQUEST_CODE = 3096;
+    private Session mSession;
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_splash_screen);
         //checkPermission("",102);
         checkPermissions_();
+       // createSession();
     }
 
+    public void createSession() {
+        // Create a new ARCore session.
+        try {
+
+            mSession = new Session(this);
+            Config config = mSession.getConfig();
+            config.setUpdateMode(Config.UpdateMode.LATEST_CAMERA_IMAGE);
+            config.setGeospatialMode(Config.GeospatialMode.ENABLED);
+            boolean isDepthSupported = mSession.isDepthModeSupported(Config.DepthMode.AUTOMATIC);
+            if (isDepthSupported) {
+                // These three settings are needed to use Geospatial Depth.
+                config.setDepthMode(Config.DepthMode.AUTOMATIC);
+                config.setGeospatialMode(Config.GeospatialMode.ENABLED);
+
+                //  config.setStreetscapeGeometryMode(Config.StreetscapeGeometryMode.ENABLED);
+            }
+            mSession.configure(config);
+
+            Toast.makeText(this, "open: "+String.valueOf(mSession.getEarth().getEarthState()), Toast.LENGTH_SHORT).show();
+
+
+
+
+        } catch (UnavailableDeviceNotCompatibleException e) {
+            throw new RuntimeException(e);
+        } catch (UnavailableSdkTooOldException e) {
+            throw new RuntimeException(e);
+        } catch (UnavailableArcoreNotInstalledException e) {
+            throw new RuntimeException(e);
+        } catch (UnavailableApkTooOldException e) {
+            throw new RuntimeException(e);
+        }
+    }
     public void checkPermission(String permission, int requestCode)
     {
         // Checking if permission is not granted
