@@ -168,10 +168,11 @@ public class ARActivity extends AppCompatActivity {
         SitumSdk.init(this);
         sharedPreferences = getSharedPreferences("settings", MODE_PRIVATE);
         voice = sharedPreferences.getBoolean("voice", true);
+        fillbuildingData();
         setupTTs();
         maybeEnableArButton();
         manageUI();
-        fillbuildingData();
+
 
 
         SitumSdk.communicationManager().fetchBuildingInfo(buildingId, new Handler<BuildingInfo>() {
@@ -182,24 +183,30 @@ public class ARActivity extends AppCompatActivity {
                 Collection<Poi> indoorPOIs = buildingInfo.getIndoorPOIs();
 
                 // ... and start positioning in that building
-                LocationRequest locationRequest = new LocationRequest.Builder().
-                        useWifi(true)
-                        .useBle(true).
-                        useGps(true).
-                        buildingIdentifier(buildingId).
-                        useBatterySaver(true).
-                        useDeadReckoning(true)
-                        .useForegroundService(false)
-                        .build();
-                Log.i(TAG, "BuildingBasicInfo = [" + buildingInfo + "]");
-                for (Floor floor : floors) {
-                    Log.i(TAG, "Floor Data = [" + floor + "]");
+                for(Poi poi: indoorPOIs) {
+                    if(poi.getIdentifier().equals(POIid)) {
+                        targetCoordinate = poi.getCoordinate();
+                        LocationRequest locationRequest = new LocationRequest.Builder().
+                                useWifi(true)
+                                .useBle(true).
+                                useGps(true).
+                                buildingIdentifier(buildingId).
+                                useBatterySaver(true).
+                                useDeadReckoning(true)
+                                .useForegroundService(false)
+                                .build();
+                        Log.i(TAG, "BuildingBasicInfo = [" + buildingInfo + "]");
+                        for (Floor floor : floors) {
+                            Log.i(TAG, "Floor Data = [" + floor + "]");
+                        }
+                        for (Poi indoorPOI : indoorPOIs) {
+                            Log.d("_", "indoorPoi = [" + indoorPOI + "]");
+                        }
+                        SitumSdk.locationManager().
+                                requestLocationUpdates(locationRequest, locationListener);
+                    }
                 }
-                for (Poi indoorPOI : indoorPOIs) {
-                    Log.d("_", "indoorPoi = [" + indoorPOI + "]");
-                }
-                  SitumSdk.locationManager().
-                        requestLocationUpdates(locationRequest, locationListener);
+
                   //changeDirection("straight");
 
             }
@@ -636,7 +643,7 @@ public class ARActivity extends AppCompatActivity {
                 POIid = bundle.getString("poiId");
                 String poiname = bundle.getString("poiName");
                 binding.poiText.setText(poiname);
-                targetCoordinate = new Coordinate(bundle.getDouble("PoicoordinateX"), bundle.getDouble("PoicoordinateY"));
+              //  targetCoordinate = new Coordinate(bundle.getDouble("PoicoordinateX"), bundle.getDouble("PoicoordinateY"));
             }
         }
     }
@@ -655,8 +662,9 @@ public class ARActivity extends AppCompatActivity {
         binding.close.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
+                startActivity(new Intent(ARActivity.this, mapActivity.class));
                 finish();
-                overridePendingTransition(R.anim.slide_in_right,R.anim.slide_out_right);
+                overridePendingTransition(R.anim.slide_in_right, R.anim.slide_out_right);
             }
         });
 
@@ -909,7 +917,7 @@ public class ARActivity extends AppCompatActivity {
                 builder.setNeutralButton("Ok", new DialogInterface.OnClickListener() {
                     @Override
                     public void onClick(DialogInterface dialogInterface, int i) {
-                      //  startActivity(new Intent(ARActivity.this, mapActivity.class));
+                        startActivity(new Intent(ARActivity.this, mapActivity.class));
                         finish();
                         overridePendingTransition(R.anim.slide_in_right, R.anim.slide_out_right);
 
@@ -949,6 +957,12 @@ public class ARActivity extends AppCompatActivity {
             //here assuming the walk speed at 1.5m/sec
             binding.timeleftText.setText(String.valueOf((navigationProgress.getTimeToGoal()/1.5)/60)
                     .toString().substring(0, 4)+"min");
+
+
+          //  Toast.makeText(ARActivity.this, String.valueOf((navigationProgress.getTimeToGoal()/1.5)/60)
+            //        .toString().substring(0, 4)+"min", Toast.LENGTH_SHORT).show();
+
+
          //   Toast.makeText(ARActivity.this, String.valueOf(distanceLeftTrue), Toast.LENGTH_SHORT).show();
             if(navigationProgress.getCurrentIndication()
                     .toString().toLowerCase().contains("straight") && distanceLeftTrue) {
@@ -964,24 +978,24 @@ public class ARActivity extends AppCompatActivity {
 
 
                     if(navigationProgress.getCurrentIndication().getOrientationType().toString().toLowerCase().contains("left")) {
-//                        addLineBetweenHits_2("left", (float) navigationProgress.
-//                                getDistanceToClosestPointInRoute(), (float)
-//                                navigationProgress.getClosestLocationInRoute().getCartesianBearing().degrees());
+                        addLineBetweenHits_2("left", (float) navigationProgress.
+                                getDistanceToClosestPointInRoute(), (float)
+                                navigationProgress.getClosestLocationInRoute().getCartesianBearing().degrees());
                     }
                     else if(navigationProgress.getCurrentIndication().getOrientationType().toString().toLowerCase().contains("right")) {
-//                        addLineBetweenHits_2("right", (float) navigationProgress.
-//                                getDistanceToClosestPointInRoute(), (float)
-//                                navigationProgress.getClosestLocationInRoute().getBearing().degrees());
+                        addLineBetweenHits_2("right", (float) navigationProgress.
+                                getDistanceToClosestPointInRoute(), (float)
+                                navigationProgress.getClosestLocationInRoute().getBearing().degrees());
                     }
                     else if(navigationProgress.getCurrentIndication().toString().toLowerCase().contains("straight")) {
-//                        addLineBetweenHits_2("straight", (float) navigationProgress.
-//                                getDistanceToClosestPointInRoute(), (float)
-//                                navigationProgress.getClosestLocationInRoute().getCartesianBearing().degrees());
+                        addLineBetweenHits_2("straight", (float) navigationProgress.
+                                getDistanceToClosestPointInRoute(), (float)
+                                navigationProgress.getClosestLocationInRoute().getCartesianBearing().degrees());
                     }
                     else if(navigationProgress.getCurrentIndication().toString().toLowerCase().contains("backward")) {
-//                        addLineBetweenHits_2("back", (float) navigationProgress.
-//                                getDistanceToClosestPointInRoute(), (float)
-//                                navigationProgress.getClosestLocationInRoute().getCartesianBearing().degrees());
+                        addLineBetweenHits_2("back", (float) navigationProgress.
+                                getDistanceToClosestPointInRoute(), (float)
+                                navigationProgress.getClosestLocationInRoute().getCartesianBearing().degrees());
                     }
 
 
@@ -1270,9 +1284,25 @@ public class ARActivity extends AppCompatActivity {
         return false;
     }
 
+
+    @Override
+    public void finish() {
+        SitumSdk.locationManager().removeUpdates();
+        SitumSdk.navigationManager().removeUpdates();
+        locationListener=null;
+        if(tts!=null) {
+            tts.stop();
+            tts.shutdown();
+        }
+        arrived=true;
+        super.finish();
+
+    }
+
     @Override
     protected void onDestroy() {
         super.onDestroy();
+        SitumSdk.locationManager().removeUpdates();
         SitumSdk.navigationManager().removeUpdates();
         locationListener=null;
         if(tts!=null) {

@@ -92,6 +92,9 @@ public class FloorSelectorView extends ConstraintLayout {
         fetchFloorsFromBuilding(floorId);
     }
 
+    public void setFloorList(Collection<Floor> floorsCollection) {
+        this.floorList= new ArrayList<>(floorsCollection);
+    }
     /**
      * Iterates the collection building's floors with the method fetchFloorsFromBuilding() of SitumSdk, stores them in reverse order.
      */
@@ -214,7 +217,7 @@ public class FloorSelectorView extends ConstraintLayout {
                     selector.scrollToPosition(floorList.indexOf(newFloor));
                 }
 
-                floorAdapter.positioningFloorChangedTo(newFloor, focusUserMarker);
+            //    floorAdapter.positioningFloorChangedTo(newFloor, focusUserMarker);
             }
 
             @Override
