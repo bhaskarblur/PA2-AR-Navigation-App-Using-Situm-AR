@@ -2,7 +2,6 @@ package com.example.indoortracking;
 
 import static android.content.ContentValues.TAG;
 
-import static uk.co.appoly.arcorelocation.utils.LocationUtils.bearing;
 
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AlertDialog;
@@ -110,10 +109,6 @@ import es.situm.sdk.navigation.NavigationRequest;
 import es.situm.sdk.utils.Handler;
 import kotlin.Unit;
 import kotlin.jvm.functions.Function1;
-import uk.co.appoly.arcorelocation.LocationMarker;
-import uk.co.appoly.arcorelocation.LocationScene;
-import uk.co.appoly.arcorelocation.rendering.LocationNode;
-import uk.co.appoly.arcorelocation.rendering.LocationNodeRender;
 
 public class ARActivity extends AppCompatActivity {
     // to be changed with intent data
@@ -141,7 +136,6 @@ public class ARActivity extends AppCompatActivity {
     private customARFrag customARFrag;
     private Node node;
     private Node node2;
-    private LocationScene locationScene;
     private int TTS_CHECK_CODE = 111;
     private TextToSpeech tts;
     AnchorNode startNode;
@@ -658,81 +652,6 @@ public class ARActivity extends AppCompatActivity {
 
     }
 
-    private void VirtualPOI() {
-        CompletableFuture<ModelRenderable> andy_ = ModelRenderable.builder().
-                setSource(
-                        ARActivity.this,
-                        RenderableSource
-                                .builder()
-                                .setSource(ARActivity.this, Uri.parse(
-                                                arrow_uri)
-                                        , RenderableSource.SourceType.GLTF2)
-                                .setScale(2.2f)
-                                .build())
-                .setRegistryId(arrow_uri)
-                .build()
-                .exceptionally(throwable -> {
-                    Toast.makeText(ARActivity.this, "error:" + throwable.getCause(), Toast.LENGTH_SHORT).show();
-                    return null;
-                });
-
-        CompletableFuture.allOf(andy_)
-                .handle(
-                        (notUsed, throwable) ->
-                        {
-                            if (throwable != null) {
-                                Toast.makeText(this, "Unable to load renderables", Toast.LENGTH_SHORT).show();
-                                return null;
-                            }
-
-                            try {
-                                andyRenderable = andy_.get();
-
-                                Frame frame = arFragment.getArSceneView().getArFrame();
-                                arFragment.getArSceneView()
-                                        .getScene()
-                                        .addOnUpdateListener(
-                                                frameTime -> {
-                                                    if (locationScene == null) {
-                                                        locationScene = new LocationScene(ARActivity.this,
-                                                                arFragment.getArSceneView());
-                                                        //  locationScene.setAnchorRefreshInterval(10000); locationScene.setMinimalRefreshing(true);
-                                                        locationScene.mLocationMarkers.add(
-                                                                new LocationMarker(
-                                                                        75.83184235373841,
-                                                                        30.919244152245323,
-                                                                        getAndy()));
-                                                        Toast.makeText(this, "Testing ArLoc POI "
-                                                                +locationScene.mLocationMarkers.size(), Toast.LENGTH_SHORT).show();
-
-                                                        for(LocationMarker locationMarker: locationScene.mLocationMarkers) {
-                                                            //   locationMarker.setOnlyRenderWhenWithin(20);
-                                                            locationMarker.setRenderEvent(new LocationNodeRender() {
-                                                                @Override
-                                                                public void render(LocationNode node) {
-                                                                    Toast.makeText(ARActivity.this, "distance" + node
-                                                                            .getDistanceInAR(), Toast.LENGTH_SHORT).show();
-                                                                    //addLineBetweenAnchors(node.getAnchor());
-                                                                }
-
-                                                            });
-                                                        }
-
-                                                    }
-
-
-                                                    if (locationScene != null) {
-                                                        locationScene.processFrame(frame);
-                                                    }
-                                                });
-
-                            } catch (InterruptedException | ExecutionException ex) {
-                                Toast.makeText(this, "Unable to load renderables", Toast.LENGTH_SHORT).show();
-                            }
-                            return null;
-                        });
-
-    }
 
     private Node getAndy() {
 
