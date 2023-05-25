@@ -224,7 +224,7 @@ public class ARActivity extends AppCompatActivity {
     }
 
 
-    private void placePOI2() {
+    private void placePOI() {
         ModelRenderable.builder().
                 setSource(
                         ARActivity.this,
@@ -306,22 +306,6 @@ public class ARActivity extends AppCompatActivity {
 
     }
 
-    private void addPOItoScene2(Anchor anchor, ModelRenderable modelRenderable, String rotate) {
-
-        Toast.makeText(this, "placed POI!", Toast.LENGTH_SHORT).show();
-        //  AnchorNode anchorNode1=new AnchorNode(anchor);
-        //anchorNode1.setRenderable(modelRenderable);
-        Node node1= new Node();
-        node1.setParent(arFragment.getArSceneView().getScene());
-        node1.setRenderable(modelRenderable);
-        node1.setLocalPosition(new Vector3(-5.32f, -1.5f, -6.58f*10f));
-        arFragment.getArSceneView().getScene().addChild(node1);
-        node1.getLocalPosition();
-
-        //  node.setLocalRotation(Quaternion.axisAngle(new Vector3(-1f, 0f, 0f), 30f));
-
-
-    }
 
     private void addPOItoScene(Anchor anchor, ModelRenderable modelRenderable, String rotate) {
         //AnchorNode node= new AnchorNode(anchor);
@@ -649,16 +633,9 @@ public class ARActivity extends AppCompatActivity {
     }
 
     private void manageUI() {
-
         arFragment = (ArFragment) getSupportFragmentManager().findFragmentById(R.id.arFragment);
-        if (mSession != null) {
-            //  arFragment.getArSceneView().setupSession(mSession);
-//           arFragment.getPlaneDiscoveryController().hide();
-//            arFragment.getPlaneDiscoveryController().setInstructionView(null);
-//            arFragment.getArSceneView().getPlaneRenderer().setEnabled(false);
 
-        }
-
+      //  placePOI();
         binding.close.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
@@ -669,8 +646,7 @@ public class ARActivity extends AppCompatActivity {
         });
 
 
-        final boolean[] anchordone = {false};
-//         placePOI2();
+
 
 
 
@@ -959,11 +935,6 @@ public class ARActivity extends AppCompatActivity {
                     .toString().substring(0, 4)+"min");
 
 
-          //  Toast.makeText(ARActivity.this, String.valueOf((navigationProgress.getTimeToGoal()/1.5)/60)
-            //        .toString().substring(0, 4)+"min", Toast.LENGTH_SHORT).show();
-
-
-         //   Toast.makeText(ARActivity.this, String.valueOf(distanceLeftTrue), Toast.LENGTH_SHORT).show();
             if(navigationProgress.getCurrentIndication()
                     .toString().toLowerCase().contains("straight") && distanceLeftTrue) {
                 reachedPOI_=true;
@@ -1002,42 +973,19 @@ public class ARActivity extends AppCompatActivity {
                     Log.d("Route Step", navigationProgress.getClosestLocationInRoute().getPosition().toString());
 
 
-//            Log.i(TAG, "Current indication " + navigationProgress.getCurrentIndication().toText(ARActivity.this));
-//            Log.i(TAG, "Next indication " + navigationProgress.getNextIndication().toText(ARActivity.this));
-//            Log.i(TAG, "");
-//            Log.i(TAG, " Distance to goal: " + navigationProgress.getDistanceToGoal());
-//            Log.i(TAG, " Time to goal: " + navigationProgress.getTimeToGoal());
-//            Log.i(TAG, " Closest location in route: " + navigationProgress.getClosestLocationInRoute());
-//            Log.i(TAG, " Distance to closest location in route: " + navigationProgress.getDistanceToClosestPointInRoute());
-//            Log.i(TAG, " Remaining segments: ");
-
             if(!routeIterated) {
-//                placeSampleLine( navigationProgress.getDistanceToClosestPointInRoute(),
-//                        (float) navigationProgress.getClosestLocationInRoute().getBearing().degrees());
+
                 for (RouteSegment segment : navigationProgress.getSegments()) {
                     Log.i(TAG, "   Floor Id: " + segment.getFloorIdentifier());
                     for (Point point : segment.getPoints()) {
-
-                        Log.d("cartesian:","next cartesian: "+point.getCartesianCoordinate().toString());
-                        Log.d("current cartesian:","current cartesian:"+coordinateConverter.toCartesianCoordinate( new Coordinate(
-                                currentLatLng.latitude, currentLatLng.longitude
-                        )));
-
-//                        routeNav.add(new LatLng(point.getCoordinate().getLatitude(), point
-//                                .getCoordinate().getLongitude()));
-                        Log.d("Point position"+segment.getPoints().size()," Latitude " + point.getCoordinate().getLatitude() + " Longitude " + point.getCoordinate().getLongitude());
+                        Log.d("Point position: "," Latitude " +
+                                point.getCoordinate().getLatitude() + " Longitude " + point.getCoordinate().getLongitude());
                     }
                     Log.i(TAG, "    ----");
 
                 }
                 Log.i(TAG, "--------");
-               // if(routeNav.size()>30) {
-                //    if(!routeIterated){
-                //addLineBetweenPoints(routeTo3DPositions(routeNav, currentLatLng));
-
                         routeIterated=true;
-              //  }}
-              //  routeIterated=true;
             }
         }
 
@@ -1062,8 +1010,6 @@ public class ARActivity extends AppCompatActivity {
 
         }
     };
-
-
 
 
     private void addLineBetweenPoints(List<Vector3> routeTo3DPositions) {
@@ -1157,7 +1103,6 @@ public class ARActivity extends AppCompatActivity {
         return positions;
     }
 
-    private Node nodeForLine;
     public void checkPermission(String permission, int requestCode)
     {
         // Checking if permission is not granted
