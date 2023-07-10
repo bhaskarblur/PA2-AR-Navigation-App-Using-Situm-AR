@@ -17,13 +17,13 @@ import es.situm.sdk.model.cartography.Poi;
 import es.situm.sdk.model.cartography.Point;
 import es.situm.sdk.model.directions.Route;
 import es.situm.sdk.model.directions.RouteSegment;
+import es.situm.sdk.model.location.CartesianCoordinate;
 import es.situm.sdk.model.location.Coordinate;
 import es.situm.sdk.model.location.Location;
 import es.situm.sdk.location.LocationListener;
 import es.situm.sdk.location.LocationRequest;
 
 import android.Manifest;
-import android.content.AsyncQueryHandler;
 import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
@@ -31,22 +31,17 @@ import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.content.pm.ResolveInfo;
 
-import android.database.Cursor;
-import android.hardware.camera2.CameraAccessException;
-import android.hardware.camera2.CameraCaptureSession;
-import android.hardware.camera2.CameraDevice;
-import android.hardware.camera2.CameraManager;
-import android.hardware.camera2.CaptureRequest;
+import android.hardware.Sensor;
+import android.hardware.SensorEvent;
+import android.hardware.SensorEventListener;
+import android.hardware.SensorManager;
 import android.media.AudioManager;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
-import android.os.Looper;
-import android.os.Message;
 import android.speech.tts.TextToSpeech;
 import android.util.Log;
 import android.view.MotionEvent;
-import android.view.Surface;
 import android.view.View;
 import android.widget.Toast;
 
@@ -55,16 +50,11 @@ import com.google.android.gms.maps.model.LatLng;
 import com.google.ar.core.Anchor;
 import com.google.ar.core.ArCoreApk;
 import com.google.ar.core.Config;
-import com.google.ar.core.Earth;
-import com.google.ar.core.Frame;
-import com.google.ar.core.GeospatialPose;
 import com.google.ar.core.HitResult;
 import com.google.ar.core.Plane;
 import com.google.ar.core.Pose;
 import com.google.ar.core.Session;
-import com.google.ar.core.TrackingState;
 
-import com.google.ar.core.exceptions.CameraNotAvailableException;
 import com.google.ar.core.exceptions.UnavailableApkTooOldException;
 import com.google.ar.core.exceptions.UnavailableArcoreNotInstalledException;
 import com.google.ar.core.exceptions.UnavailableDeviceNotCompatibleException;
@@ -81,13 +71,12 @@ import com.google.ar.sceneform.assets.RenderableSource;
 import com.google.ar.sceneform.collision.Ray;
 import com.google.ar.sceneform.math.Quaternion;
 import com.google.ar.sceneform.math.Vector3;
-import com.google.ar.sceneform.rendering.Color;
 import com.google.ar.sceneform.rendering.MaterialFactory;
 import com.google.ar.sceneform.rendering.ModelRenderable;
 import com.google.ar.sceneform.rendering.ShapeFactory;
 import com.google.ar.sceneform.rendering.Texture;
 import com.google.ar.sceneform.ux.ArFragment;
-import com.google.ar.sceneform.ux.TransformableNode;
+import com.google.ar.sceneform.ux.BaseArFragment;
 
 import java.util.ArrayList;
 import java.util.Collection;
@@ -96,9 +85,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutionException;
-import java.util.function.Consumer;
+import java.util.concurrent.TimeUnit;
 
 import es.situm.sdk.SitumSdk;
 import es.situm.sdk.location.LocationStatus;
@@ -107,13 +94,11 @@ import es.situm.sdk.model.navigation.NavigationProgress;
 import es.situm.sdk.navigation.NavigationListener;
 import es.situm.sdk.navigation.NavigationRequest;
 import es.situm.sdk.utils.Handler;
-import kotlin.Unit;
-import kotlin.jvm.functions.Function1;
 
-public class ARActivity extends AppCompatActivity {
+public class ARActivity extends AppCompatActivity implements SensorEventListener {
     // to be changed with intent data
-    private String buildingId = "13347"; //13347
-    private String targetFloorId = "42059";
+    private String buildingId = "13278"; //13347 - 9640
+    private String targetFloorId = "42059"; //136775 - 42059
     private String arrow_uri = "https://raw.githubusercontent.com/2wizstudio/indoorNav/main/arrow.gltf";
     private String poi_uri = "https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Models/master/1.0/SmilingFace/glTF/SmilingFace.gltf";
 
@@ -122,7 +107,6 @@ public class ARActivity extends AppCompatActivity {
     private boolean isNavigating = false;
     private boolean arrived = false;
     private ActivityAractivityBinding binding;
-    // To store the building information after we retrieve it
     private BuildingInfo buildingInfo_;
     private String POIid;
     private Session mSession;
@@ -132,15 +116,10 @@ public class ARActivity extends AppCompatActivity {
     private boolean routeFound = false;
     private boolean isModelPlaced = false;
     private ArFragment arFragment;
-    private AnchorNode anchorNode;
-    private customARFrag customARFrag;
-    private Node node;
-    private Node node2;
     private int TTS_CHECK_CODE = 111;
     private TextToSpeech tts;
     AnchorNode startNode;
     AnchorNode endNode;
-    ModelRenderable andyRenderable;
     private AnchorNode lastAnchorNode = new AnchorNode();
 
     private boolean reachedPOI_ = false;
@@ -152,7 +131,22 @@ public class ARActivity extends AppCompatActivity {
     private boolean NotoutsideRoute = true;
     private boolean routeDrawn = false;
     private double bearingFirst;
+
+    private SensorManager sensorManager;
+    private Sensor sensor;
+
     CoordinateConverter coordinateConverter;
+    float Rot[]=null; //for gravity rotational data
+    //don't use R because android uses that for other stuff
+    float I[]=null; //for magnetic rotational data
+    float accels[]=new float[3];
+    float mags[]=new float[3];
+    float[] values = new float[3];
+
+    float azimuth;
+    float pitch;
+    float roll;
+    private Boolean isUpdated=false;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -160,6 +154,7 @@ public class ARActivity extends AppCompatActivity {
         binding = ActivityAractivityBinding.inflate(getLayoutInflater());
         setContentView(binding.getRoot());
         SitumSdk.init(this);
+        SitumSdk.configuration().setCacheMaxAge(30, TimeUnit.SECONDS);
         sharedPreferences = getSharedPreferences("settings", MODE_PRIVATE);
         voice = sharedPreferences.getBoolean("voice", true);
         fillbuildingData();
@@ -167,7 +162,22 @@ public class ARActivity extends AppCompatActivity {
         maybeEnableArButton();
         manageUI();
 
+        SitumSdk.communicationManager().fetchIndoorPOIsFromBuilding(buildingId, new Handler<Collection<Poi>>() {
+            @Override
+            public void onSuccess(Collection<Poi> pois) {
+                for(Poi poi: pois) {
+                    Log.d("Pois:", ":"+poi.getName().toString()+","
+                    +poi.getIdentifier().toString());
+                }
+            }
 
+            @Override
+            public void onFailure(Error error) {
+
+            }
+        });
+        sensorManager = (SensorManager) getSystemService(Context.SENSOR_SERVICE);
+        sensor = sensorManager.getDefaultSensor(Sensor.TYPE_GEOMAGNETIC_ROTATION_VECTOR);
 
         SitumSdk.communicationManager().fetchBuildingInfo(buildingId, new Handler<BuildingInfo>() {
             @Override
@@ -189,19 +199,14 @@ public class ARActivity extends AppCompatActivity {
                                 useDeadReckoning(true)
                                 .useForegroundService(false)
                                 .build();
-                        Log.i(TAG, "BuildingBasicInfo = [" + buildingInfo + "]");
-                        for (Floor floor : floors) {
-                            Log.i(TAG, "Floor Data = [" + floor + "]");
-                        }
-                        for (Poi indoorPOI : indoorPOIs) {
-                            Log.d("_", "indoorPoi = [" + indoorPOI + "]");
-                        }
+                        locationRequest.autoEnableBleDuringPositioning();
+
+
                         SitumSdk.locationManager().
                                 requestLocationUpdates(locationRequest, locationListener);
                     }
                 }
 
-                  //changeDirection("straight");
 
             }
 
@@ -215,10 +220,11 @@ public class ARActivity extends AppCompatActivity {
         });
 
 
+
     }
 
 
-    private void placePOI() {
+    private void placePOI(AnchorNode reference, float azim_) {
         ModelRenderable.builder().
                 setSource(
                         ARActivity.this,
@@ -227,145 +233,52 @@ public class ARActivity extends AppCompatActivity {
                                 .setSource(ARActivity.this, Uri.parse(
                                                 poi_uri)
                                         , RenderableSource.SourceType.GLTF2)
-                                .setScale(4.2f)
+                                .setScale(.2f)
                                 .build())
                 .setRegistryId(poi_uri)
                 .build()
-                .thenAccept(modelRenderable -> addPOItoScene(null, modelRenderable, "straight"))
+                .thenAccept(modelRenderable -> addPOItoSceneFinal( modelRenderable,reference, azim_ ))
                 .exceptionally(throwable -> {
-                    //   Toast.makeText(ARActivity.this, "error:"+throwable.getCause(), Toast.LENGTH_SHORT).show();
+                       Toast.makeText(ARActivity.this, "error:"+throwable.getCause(), Toast.LENGTH_SHORT).show();
                     return null;
                 });
     }
 
-    private void placeSampleLine(double distance, float rotation) {
-        arFragment.getArSceneView().getScene().addOnUpdateListener(new Scene.OnUpdateListener() {
+    public void testingSitumFunc(List<CartesianCoordinate> coordinates,Float azim_) {
+        final boolean[] isPlaced = {false};
+        arFragment = (ArFragment) getSupportFragmentManager().findFragmentById(R.id.arFragment);
+        arFragment.setOnTapArPlaneListener(new BaseArFragment.OnTapArPlaneListener() {
             @Override
-            public void onUpdate(FrameTime frameTime) {
-                Frame frame=arFragment.getArSceneView().getArFrame();
-                Collection<Plane> planes= frame.getUpdatedTrackables(Plane.class);
+            public void onTapPlane(HitResult hitResult, Plane plane, MotionEvent motionEvent) {
+                if (!isPlaced[0]) {
+                    Anchor anchor= hitResult.createAnchor();
+                    AnchorNode anchorNode = new AnchorNode(anchor);
+                    binding.instrText.setText("Please wait while we calculate the route! Don't move!");
+                    placeSampleLine(anchorNode, false);
+                    placePOI(anchorNode, azim_);
 
-                for(Plane plane:planes) {
-                    if(plane.getTrackingState()== TrackingState.TRACKING) {
-                        if (lastAnchorNode != null) {
-                            AnchorNode anchorNode1= new AnchorNode(plane.createAnchor(plane.getCenterPose()));
-                            Texture.Sampler sampler = Texture.Sampler.builder()
-                                    .setMinFilter(Texture.Sampler.MinFilter.LINEAR_MIPMAP_LINEAR)
-                                    .setMagFilter(Texture.Sampler.MagFilter.LINEAR)
-                                    .build();
-                            //   Toast.makeText(this, String.valueOf(difference.length()), Toast.LENGTH_SHORT).show();
-                            // 1. Make a texture
-                            Texture.builder()
-                                    .setSource(() -> getApplicationContext().getAssets().open("arrow_texture.png"))
-                                    .setSampler(sampler)
-                                    .build().thenAccept(texture -> {
-                                        MaterialFactory.makeTransparentWithTexture(getApplicationContext(), texture) //new Color(0, 255, 244))
-                                                .thenAccept(
-                                                        material -> {
-                                                            ModelRenderable model = ShapeFactory.makeCube(
-                                                                    new Vector3(.3f, .008f, (float) distance+2f),
-                                                                    Vector3.zero(), material);
+                    for(int i=0; i<coordinates.size(); i++) {
+                        AnchorNode repNode= new AnchorNode(null);
+                            repNode.setLocalPosition(
+                                    new Vector3((float) (anchorNode.getLocalPosition()
+                                            .x + coordinates.get(i).getX()), anchorNode.getLocalPosition()
+                                            .y, (float) (anchorNode.getLocalPosition()
+                                            .z - coordinates.get(i).getY())));
 
-//                                            float[] position_ = {0f, -1.5f, -2f};
-//                                            float[] rotation_ = {0, 0, 0, 1};
-//                                            Pose pose = new Pose(position_, rotation_);
-//                                            Anchor anchor = arFragment.getArSceneView().getSession().
-//                                                    createAnchor(Pose.makeTranslation(0,-1f,-2));
-//
-//                                            AnchorNode node_= new AnchorNode(anchor);
-//                                            node_.setParent(anchorNode);
-                                                            anchorNode1.setRenderable(model);
-                                                            arFragment.getArSceneView().getScene().addChild(anchorNode1);
-                                                            Toast.makeText(ARActivity.this, "Placed!", Toast.LENGTH_SHORT).show();
-                                                          //  anchorNode1.setLocalPosition(new Vector3(0f,-1f, 0f));
-                                                            anchorNode1.setLocalRotation(Quaternion.axisAngle(new Vector3(
-                                                                    0f,2f,0f
-                                                            ), rotation));
-                                                            Toast.makeText(ARActivity.this, "Distance1:"
-                                                                    +distance, Toast.LENGTH_SHORT).show();
-                                                            Toast.makeText(ARActivity.this, "Rotation1: "
-                                                                    +rotation, Toast.LENGTH_SHORT).show();
-
-
-                                                        }
-                                                );
-                                    });
-                            lastAnchorNode = anchorNode;
-                        }
-                        break;
+                    placeSampleLine(repNode, true);
                     }
+                    isPlaced[0] = true;
                 }
-            }
-        });
 
-    }
-
-
-    private void addPOItoScene(Anchor anchor, ModelRenderable modelRenderable, String rotate) {
-        //AnchorNode node= new AnchorNode(anchor);
-        List<Node> children = new ArrayList<>(arFragment.getArSceneView().getScene().getChildren());
-        node = new Node();
-
-        arFragment.getArSceneView().getScene().addOnUpdateListener(new Scene.OnUpdateListener() {
-            @Override
-            public void onUpdate(FrameTime frameTime) {
-                if (reachedPOI_) {
-                    for (Node node_ : children) {
-                        if (node_ instanceof AnchorNode) {
-                            if (((AnchorNode) node_).getAnchor() != null) {
-                                ((AnchorNode) node_).getAnchor().detach();
-
-                            }
-                        }
-                        if (!(node_ instanceof Camera) && !(node_ instanceof Sun)) {
-                            node_.setParent(null);
-                        }
-                    }
-
-                    //  AnchorNode anchorNode1=new AnchorNode(anchor);
-                    //anchorNode1.setRenderable(modelRenderable);
-                    node.setParent(arFragment.getArSceneView().getScene());
-                    node.setRenderable(modelRenderable);
-                    arFragment.getArSceneView().getScene().addChild(node);
-                    Camera camera = arFragment.getArSceneView().getScene().getCamera();
-                    Ray ray = camera.screenPointToRay(1080 / 2f, 2260 / 2f);
-                    Vector3 newpos = ray.getPoint(26f);
-                    node.setLocalPosition(newpos);
-                    node.setLocalRotation(Quaternion.axisAngle(new Vector3(-1f, 0f, 0f), 30f));
-                } else {
-                    //     Toast.makeText(ARActivity.this, "removed", Toast.LENGTH_SHORT).show();
-
-                    for (Node node_ : children) {
-                        if (node_ instanceof AnchorNode) {
-                            if (((AnchorNode) node_).getAnchor() != null) {
-                                node_.setParent(null);
-                                for (Anchor anchor1 : Objects.requireNonNull(arFragment.getArSceneView().getSession()).getAllAnchors()) {
-                                    arFragment.getArSceneView().getSession().getAllAnchors().remove(anchor1);
-                                }
-                                ((AnchorNode) node_).getAnchor().detach();
-                                arFragment.getArSceneView().getScene().removeChild(node_);
-
-                            }
-                        }
-                        if (!(node_ instanceof Camera) && !(node_ instanceof Sun)) {
-                            node_.setParent(null);
-                        }
-                    }
-                }
+                routeIterated=true;
             }
         });
 
 
+
     }
 
-    private void addLineBetweenHits(HitResult hitResult, Plane plane, MotionEvent motionEvent) {
-        Anchor anchor = hitResult.createAnchor();
-        AnchorNode anchorNode = new AnchorNode(anchor);
-        Log.d("RayPoint", "Raypoint: " + anchorNode.getWorldPosition().x + "," +
-                anchorNode.getWorldPosition().y + "," + anchorNode.getWorldPosition().z);
-        Log.d("RayPoint", "RayRotate: " + anchorNode.getWorldRotation().x + "," +
-                anchorNode.getWorldRotation().y + "," + anchorNode.getWorldRotation().z + "," +
-                anchorNode.getWorldRotation().w);
+    private void placeSampleLine(AnchorNode anchorNode, boolean place_) {
         if (lastAnchorNode != null) {
             anchorNode.setParent(arFragment.getArSceneView().getScene());
             Vector3 point1, point2;
@@ -376,6 +289,8 @@ public class ARActivity extends AppCompatActivity {
             First, find the vector extending between the two points and define a look rotation
             in terms of this Vector.
         */
+
+            if(place_) {
             final Vector3 difference = Vector3.subtract(point1, point2);
             final Vector3 directionFromTopToBottom = difference.normalized();
             final Quaternion rotationFromAToB =
@@ -383,12 +298,9 @@ public class ARActivity extends AppCompatActivity {
             Texture.Sampler sampler = Texture.Sampler.builder()
                     .setMinFilter(Texture.Sampler.MinFilter.LINEAR_MIPMAP_LINEAR)
                     .setMagFilter(Texture.Sampler.MagFilter.LINEAR)
-                    // .setWrapModeR(Texture.Sampler.WrapMode.REPEAT)
-                    // .setWrapModeS(Texture.Sampler.WrapMode.REPEAT)
-                    // .setWrapModeT(Texture.Sampler.WrapMode.REPEAT)
                     .build();
-            //   Toast.makeText(this, String.valueOf(difference.length()), Toast.LENGTH_SHORT).show();
-            // 1. Make a texture
+
+
             Texture.builder()
                     .setSource(() -> getApplicationContext().getAssets().open("arrow_texture.png"))
                     .setSampler(sampler)
@@ -399,163 +311,58 @@ public class ARActivity extends AppCompatActivity {
 /* Then, create a rectangular prism, using ShapeFactory.makeCube() and use the difference vector
        to extend to the necessary length.  */
                                             ModelRenderable model = ShapeFactory.makeCube(
-                                                    new Vector3(.2f, .008f, difference.length()),
+                                                    new Vector3(.3f, .006f, difference.length()),
                                                     Vector3.zero(), material);
 /* Last, set the world rotation of the node to the rotation calculated earlier and set the world position to
        the midpoint between the given points . */
-                                            Node node = new Node();
+                                            AnchorNode node = new AnchorNode();
                                             node.setParent(anchorNode);
                                             node.setRenderable(model);
                                             node.setWorldPosition(Vector3.add(point1, point2).scaled(.5f));
-                                            //  node.setLocalPosition(new Vector3(0f, -.5f, -0.5f));
                                             node.setWorldRotation(rotationFromAToB);
                                         }
                                 );
                     });
-            lastAnchorNode = anchorNode;
+
         }
-    }
-
-    private void addLineBetweenHits_2(String rotate, float difference, float degree) {
-        // Anchor anchor = arFragment.getArSceneView().getSession().createAnchor(arFragment.getArSceneView().getArFrame().getCamera().getPose())
-
-        Texture.Sampler sampler = Texture.Sampler.builder()
-                .setMinFilter(Texture.Sampler.MinFilter.LINEAR_MIPMAP_LINEAR)
-                .setMagFilter(Texture.Sampler.MagFilter.LINEAR)
-                // .setWrapModeR(Texture.Sampler.WrapMode.REPEAT)
-                // .setWrapModeS(Texture.Sampler.WrapMode.REPEAT)
-                // .setWrapModeT(Texture.Sampler.WrapMode.REPEAT)
-                .build();
-        // 1. Make a texture
-        Texture.builder()
-                .setSource(() -> getApplicationContext().getAssets().open("arrow_texture.png"))
-                .setSampler(sampler)
-                .build().thenAccept(texture -> {
-                    MaterialFactory.makeTransparentWithTexture(getApplicationContext(), texture) //new Color(0, 255, 244))
-                            .thenAccept(
-                                    material -> {
-/* Then, create a rectangular prism, using ShapeFactory.makeCube() and use the difference vector
-       to extend to the necessary length.  */
-                                        ModelRenderable model = ShapeFactory.makeCube(
-                                                new Vector3(1.6f, .008f, difference + 4f),
-                                                Vector3.zero(), material);
-                                        addFinalLineModelToScene(model, rotate, degree);
-                                    }
-                            );
-                });
-
-    }
-
-    private void addLineBetweenAnchors(Anchor anchor) {
-        //Anchor anchor_ = anchor;
-        AnchorNode anchorNode = new AnchorNode(anchor);
-        Log.d("RayPoint", "Raypoint: " + anchorNode.getWorldPosition().x + "," +
-                anchorNode.getWorldPosition().y + "," + anchorNode.getWorldPosition().z);
-        Log.d("RayPoint", "RayRotate: " + anchorNode.getWorldRotation().x + "," +
-                anchorNode.getWorldRotation().y + "," + anchorNode.getWorldRotation().z + "," +
-                anchorNode.getWorldRotation().w);
-        //  Toast.makeText(this, "value: "+String.valueOf(anchor.getPose().getXAxis().length), Toast.LENGTH_SHORT).show();
-        if (lastAnchorNode != null) {
-            anchorNode.setParent(arFragment.getArSceneView().getScene());
-            Vector3 point1, point2;
-            point1 = lastAnchorNode.getWorldPosition();
-            point2 = anchorNode.getWorldPosition();
-
-        /*
-            First, find the vector extending between the two points and define a look rotation
-            in terms of this Vector.
-        */
-            final Vector3 difference = Vector3.subtract(point1, point2);
-            final Vector3 directionFromTopToBottom = difference.normalized();
-            final Quaternion rotationFromAToB =
-                    Quaternion.lookRotation(directionFromTopToBottom, Vector3.up());
-            Texture.Sampler sampler = Texture.Sampler.builder()
-                    .setMinFilter(Texture.Sampler.MinFilter.LINEAR_MIPMAP_LINEAR)
-                    .setMagFilter(Texture.Sampler.MagFilter.LINEAR)
-                    // .setWrapModeR(Texture.Sampler.WrapMode.REPEAT)
-                    // .setWrapModeS(Texture.Sampler.WrapMode.REPEAT)
-                    // .setWrapModeT(Texture.Sampler.WrapMode.REPEAT)
-                    .build();
-            //   Toast.makeText(this, String.valueOf(difference.length()), Toast.LENGTH_SHORT).show();
-            // 1. Make a texture
-            Texture.builder()
-                    .setSource(() -> getApplicationContext().getAssets().open("arrow_texture.png"))
-                    .setSampler(sampler)
-                    .build().thenAccept(texture -> {
-                        MaterialFactory.makeTransparentWithTexture(getApplicationContext(), texture) //new Color(0, 255, 244))
-                                .thenAccept(
-                                        material -> {
-/* Then, create a rectangular prism, using ShapeFactory.makeCube() and use the difference vector
-       to extend to the necessary length.  */
-                                            ModelRenderable model = ShapeFactory.makeCube(
-                                                    new Vector3(.2f, .008f, difference.length()),
-                                                    Vector3.zero(), material);
-/* Last, set the world rotation of the node to the rotation calculated earlier and set the world position to
-       the midpoint between the given points . */
-                                            Node node = new Node();
-                                            node.setParent(anchorNode);
-                                            node.setRenderable(model);
-                                            node.setWorldPosition(Vector3.add(point1, point2).scaled(.5f));
-                                            //  node.setLocalPosition(new Vector3(0f, -.5f, -0.5f));
-                                            node.setWorldRotation(rotationFromAToB);
-                                        }
-                                );
-                    });
-            lastAnchorNode = anchorNode;
-        }
-    }
-
-
-    private void addFinalLineModelToScene(ModelRenderable renderable, String rotate, float degree) {
-        List<Node> children = new ArrayList<>(arFragment.getArSceneView().getScene().getChildren());
-
-        for (Node node_ : children) {
-            if (node_ instanceof AnchorNode) {
-                if (((AnchorNode) node_).getAnchor() != null) {
-                    ((AnchorNode) node_).getAnchor().detach();
-
-                }
+            if(!place_) {
+//                Toast.makeText(this, anchorNode.getLocalPosition().toString(), Toast.LENGTH_SHORT).show();
             }
-            if (!(node_ instanceof Camera) && !(node_ instanceof Sun)) {
-                node_.setParent(null);
-            }
-        }
-        node = new Node();
-        node.setParent(arFragment.getArSceneView().getScene());
-        node.setRenderable(renderable);
-        //  AnchorNode anchorNode1=new AnchorNode(anchor);
-        //anchorNode1.setRenderable(modelRenderable);
-        arFragment.getArSceneView().getScene().addChild(node);
-        // arFragment.getArSceneView().getScene().addOnUpdateListener(new Scene.OnUpdateListener() {
-        //    @Override
-        //    public void onUpdate(FrameTime frameTime) {
 
-        Camera camera = arFragment.getArSceneView().getScene().getCamera();
-        Ray ray = camera.screenPointToRay(1080 / 2f, 2820 / 2f);
-        Vector3 newpos = ray.getPoint(4f);
-        //  node.setLocalPosition(new Vector3(newpos.x, newpos.y-1.5f, newpos.z-1.5f));
-        //  node.setLocalPosition(new Vector3(camera.getLocalPosition().x+0f,
-        //          camera.getLocalPosition().y-1.5f, camera.getLocalPosition().y- 2.5f));
-        if (rotate.equals("straight")) {
-            node.setLocalPosition(new Vector3(newpos.x, newpos.y - 1.6f, newpos.z - 1.8f));
-            node.setLocalRotation(Quaternion.axisAngle(new Vector3(0f, 1f, 0f), 180f));
+            Log.d("position:",anchorNode.getLocalPosition().toString());
+            lastAnchorNode = anchorNode;
 
         }
-        if (rotate.equals("left")) {
-            node.setLocalPosition(new Vector3(newpos.x, newpos.y - 1.6f, newpos.z - 2.6f));
-            node.setLocalRotation(Quaternion.axisAngle(new Vector3(0f, 1f, 0f), -degree));
-        }
-        if (rotate.equals("back")) {
-            node.setLocalPosition(new Vector3(newpos.x, newpos.y - 1.6f, newpos.z - 2.8f));
-            node.setLocalRotation(Quaternion.axisAngle(new Vector3(0f, 1f, 0f), 0f));
-        }
-        if (rotate.equals("right")) {
-            node.setLocalPosition(new Vector3(newpos.x, newpos.y - 1.6f, newpos.z - 2.6f));
-            node.setLocalRotation(Quaternion.axisAngle(new Vector3(0f, 1f, 0f), degree));
-        }
+    }
 
+    private void addPOItoSceneFinal(ModelRenderable modelRenderable, AnchorNode reference, float  azim_) {
+
+                      AnchorNode anchorNode1=new AnchorNode(null);
+                    anchorNode1.setRenderable(modelRenderable);
+                    arFragment.getArSceneView().getScene().addChild(anchorNode1);
+                    CartesianHelper cartesianHelper=new CartesianHelper(currentLatLng);
+                    com.example.indoortracking.Coordinate Convcoordinate_ =
+                            cartesianHelper.GetLocalCoordinates(new LatLng(
+                                    targetCoordinate.getLatitude(),
+                                    targetCoordinate.getLongitude()
+                            ), azim_);
+
+
+                    CartesianCoordinate Singlecoordinate=
+                            new CartesianCoordinate(Convcoordinate_.x, Convcoordinate_.y);
+
+                    anchorNode1.setLocalPosition(new Vector3(
+                            (float) (reference.getLocalPosition().x+ Singlecoordinate.getX()),
+                            reference.getLocalPosition().y+.15f,
+                            (float) (reference.getLocalPosition().z-Singlecoordinate.getY())
+                    ));
+
+                    anchorNode1.setLocalRotation(Quaternion.axisAngle(new Vector3(0f, -1f, 0f), 30f));
+                    binding.instrText.setVisibility(View.GONE);
 
     }
+
+
 
     private void setupTTs() {
         PackageManager pm = getPackageManager();
@@ -621,15 +428,34 @@ public class ARActivity extends AppCompatActivity {
                 POIid = bundle.getString("poiId");
                 String poiname = bundle.getString("poiName");
                 binding.poiText.setText(poiname);
-              //  targetCoordinate = new Coordinate(bundle.getDouble("PoicoordinateX"), bundle.getDouble("PoicoordinateY"));
+                targetCoordinate = new Coordinate(bundle.getDouble("PoicoordinateX"), bundle.getDouble("PoicoordinateY"));
             }
         }
     }
 
     private void manageUI() {
-        arFragment = (ArFragment) getSupportFragmentManager().findFragmentById(R.id.arFragment);
+        binding.recenter2.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                if(arFragment!=null) {
+                routeIterated=false;
+                List<Node> children = new ArrayList<>(arFragment.getArSceneView().getScene().getChildren());
+                for (Node node_ : children) {
+                    if (node_ instanceof AnchorNode) {
+                        if (((AnchorNode) node_).getAnchor() != null) {
+                            node_.setParent(null);
+                            ((AnchorNode) node_).getAnchor().detach();
+                            arFragment.getArSceneView().getScene().removeChild(node_);
 
-      //  placePOI();
+                        }
+                    }
+                    if (!(node_ instanceof Camera) && !(node_ instanceof Sun)) {
+                        node_.setParent(null);
+                    }
+                }
+            }
+            }
+        });
         binding.close.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
@@ -642,37 +468,23 @@ public class ARActivity extends AppCompatActivity {
 
 
 
-
-
-//        arFragment.setOnTapArPlaneListener(
-//                (HitResult hitResult, Plane plane, MotionEvent motionEvent) -> {
-//                    //setModelPlaced();
-//                   // addLineBetweenHits(hitResult, plane, motionEvent);
-//                });
-
     }
 
-
-    private Node getAndy() {
-
-        Node base = new Node();
-        base.setRenderable(andyRenderable);
-        Context c = this;
-        base.setOnTapListener((v, event) -> {
-            Toast.makeText(
-                            c, "POI touched.", Toast.LENGTH_LONG)
-                    .show();
-        });
-        return base;
-    }
+    private Boolean sampleYes=false;
     private LocationListener locationListener = new LocationListener() {
 
         @Override
         public void onLocationChanged(@NonNull Location location) {
+
+
             Log.i(TAG, "Updating User navigation with: location = [" + location + "]");
             if(!location.getFloorIdentifier().toString().equals("-1")) {
                // Toast.makeText(ARActivity.this, location.getFloorIdentifier(), Toast.LENGTH_SHORT).show();
                 if (isNavigating) {
+                    currentLatLng = new LatLng(location.getCoordinate().getLatitude(),
+                            location.getCoordinate().getLongitude());
+
+
                     SitumSdk.navigationManager().updateWithLocation(location);
                     if (locationFound == false) {
                         binding.statusText.setText("Calculating distance to your destination.");
@@ -692,28 +504,20 @@ public class ARActivity extends AppCompatActivity {
 
                 }
             }
+
         }
 
         @Override
         public void onStatusChanged(@NonNull LocationStatus locationStatus) {
-            runOnUiThread(new Runnable() {
-                @Override
-                public void run() {
-                //    binding.statusText.setText(locationStatus.toString());
-                }
-            });
 
             Log.i(TAG, "User Location changed called with: status = [" + locationStatus + "]");
-            if(locationStatus.toString().toLowerCase().contains("building")) {
-                binding.statusText.setText("You are not in the building!");
-            }
 
         }
 
         @Override
         public void onError(@NonNull Error error) {
             Toast.makeText(ARActivity.this, error.getMessage(), Toast.LENGTH_SHORT).show();
-            binding.statusText.setText("Couldn't access user location");
+            binding.statusText.setText("Failed to create navigation due to location issue.");
             binding.progressBar.setVisibility(View.GONE);
             Log.e(TAG, "User Location error called with: error = [" + error + "]");
         }
@@ -739,27 +543,16 @@ public class ARActivity extends AppCompatActivity {
         SitumSdk.directionsManager().requestDirections(directionsRequest, new Handler<Route>() {
             @Override
             public void onSuccess(Route route) {
-                // When the route is computed, we configure the NavigationRequest
-//                Toast.makeText(ARActivity.this, "Route Dis"+
-//                        String.valueOf(
-//                                route.getFirstStep().getFrom().getCoordinate().distanceTo(
-//                                        route.getLastStep().getTo().getCoordinate())), Toast.LENGTH_SHORT).show();
-//                route.getFirstStep().getFrom().getCoordinate().distanceTo(
-//                        route.getLastStep().getTo().getCoordinate());
-
-//                Toast.makeText(ARActivity.this, "First Distance:"+
-//                        route.getFirstStep().getFrom().getCoordinate().distanceTo(route
-//                                .getSteps().get(1).getTo().getCoordinate()), Toast.LENGTH_SHORT).show();
-
+                binding.instrText.setVisibility(View.VISIBLE);
                 NavigationRequest navigationRequest = new NavigationRequest.Builder().
                         // Navigation will take place along this route
                                 route(route).
                         //indicationsInterval(300)
-                        distanceToChangeIndicationThreshold(2).
+//                        distanceToChangeIndicationThreshold(2).
 
                         // ... stopping when we're closer than 4 meters to the destination
                                 // change this later
-                                distanceToGoalThreshold(3).
+                                distanceToGoalThreshold(4).
                         // ... or we're farther away than 10 meters from the route
                                 outsideRouteThreshold(3).
                         // Low quality locations will not be taken into account when updating the navigation state
@@ -839,7 +632,6 @@ public class ARActivity extends AppCompatActivity {
             binding.progressBar.setVisibility(View.GONE);
             NotoutsideRoute=true;
             Log.d("current indication", navigationProgress.getCurrentIndication().toString());
-            speakTTs(navigationProgress.getNextIndication().toText(ARActivity.this));
             if(String.valueOf(navigationProgress.getDistanceToClosestPointInRoute()).toString().length()>5) {
                 binding.distanceleftText.setText(String.valueOf(navigationProgress.getDistanceToGoal() * 3.281)
                         .substring(0, 5) + "Ft");
@@ -861,50 +653,52 @@ public class ARActivity extends AppCompatActivity {
             else {
                 reachedPOI_=false;
             }
-           // bearingFirst= (double) navigationProgress.getClosestLocationInRoute().getBearing().degrees();
-           // Toast.makeText(ARActivity.this, String.valueOf(bearingFirst), Toast.LENGTH_SHORT).show();
-          //  Log.d("bearing", String.valueOf(bearingFirst));
             binding.indicText.setText(navigationProgress.getCurrentIndication().getOrientationType().toString());
 
+            if(!isUpdated) {
+                speakTTs(navigationProgress.getNextIndication().toText(ARActivity.this));
+                new android.os.Handler().postDelayed(new Runnable() {
+                    @Override
+                    public void run() {
+                        isUpdated=false;
+                    }
+                }, 6000);
+            }
 
-                    if(navigationProgress.getCurrentIndication().getOrientationType().toString().toLowerCase().contains("left")) {
-                        addLineBetweenHits_2("left", (float) navigationProgress.
-                                getDistanceToClosestPointInRoute(), (float)
-                                navigationProgress.getClosestLocationInRoute().getCartesianBearing().degrees());
-                    }
-                    else if(navigationProgress.getCurrentIndication().getOrientationType().toString().toLowerCase().contains("right")) {
-                        addLineBetweenHits_2("right", (float) navigationProgress.
-                                getDistanceToClosestPointInRoute(), (float)
-                                navigationProgress.getClosestLocationInRoute().getBearing().degrees());
-                    }
-                    else if(navigationProgress.getCurrentIndication().toString().toLowerCase().contains("straight")) {
-                        addLineBetweenHits_2("straight", (float) navigationProgress.
-                                getDistanceToClosestPointInRoute(), (float)
-                                navigationProgress.getClosestLocationInRoute().getCartesianBearing().degrees());
-                    }
-                    else if(navigationProgress.getCurrentIndication().toString().toLowerCase().contains("backward")) {
-                        addLineBetweenHits_2("back", (float) navigationProgress.
-                                getDistanceToClosestPointInRoute(), (float)
-                                navigationProgress.getClosestLocationInRoute().getCartesianBearing().degrees());
-                    }
+            isUpdated=true;
 
-
-                    Log.d("Route Step", navigationProgress.getClosestLocationInRoute().getPosition().toString());
+            Log.d("Route Step", navigationProgress.getClosestLocationInRoute().getPosition().toString());
 
 
             if(!routeIterated) {
+                List<CartesianCoordinate> coordinates = new ArrayList<>();
+                CartesianHelper cartesianHelper=new CartesianHelper(currentLatLng);
 
                 for (RouteSegment segment : navigationProgress.getSegments()) {
                     Log.i(TAG, "   Floor Id: " + segment.getFloorIdentifier());
                     for (Point point : segment.getPoints()) {
-                        Log.d("Point position: "," Latitude " +
-                                point.getCoordinate().getLatitude() + " Longitude " + point.getCoordinate().getLongitude());
+                        float yaw= azimuth;
+
+
+                        com.example.indoortracking.Coordinate Convcoordinate_ =
+                                cartesianHelper.GetLocalCoordinates(new LatLng(
+                                        point.getCoordinate().getLatitude(),
+                                        point.getCoordinate().getLongitude()
+                                ), yaw);
+
+
+                        CartesianCoordinate Singlecoordinate=
+                                new CartesianCoordinate(Convcoordinate_.x, Convcoordinate_.y);
+
+                        coordinates.add(Singlecoordinate);
+
                     }
                     Log.i(TAG, "    ----");
 
                 }
-                Log.i(TAG, "--------");
-                        routeIterated=true;
+
+                testingSitumFunc(coordinates, azimuth);
+
             }
         }
 
@@ -930,112 +724,6 @@ public class ARActivity extends AppCompatActivity {
         }
     };
 
-
-    private void addLineBetweenPoints(List<Vector3> routeTo3DPositions) {
-
-            for (Vector3 pt : routeTo3DPositions) {
-                float[] position_ = {pt.x, pt.y, pt.z};
-                float[] rotation_ = {0, 0, 0, 1};
-                Pose pose = new Pose(position_, rotation_);
-                Anchor anchor = arFragment.getArSceneView().getSession().createAnchor(pose);
-                AnchorNode anchorNode = new AnchorNode(anchor);
-                Toast.makeText(this, "Placing points!", Toast.LENGTH_SHORT).show();
-                Toast.makeText(this, String.valueOf(
-                        routeTo3DPositions.size()
-                ), Toast.LENGTH_SHORT).show();
-
-
-                if (lastAnchorNode != null) {
-                    anchorNode.setParent(arFragment.getArSceneView().getScene());
-                    Vector3 point1, point2;
-                    point1 = lastAnchorNode.getWorldPosition();
-                    point2 = anchorNode.getWorldPosition();
-
-        /*
-            First, find the vector extending between the two points and define a look rotation
-            in terms of this Vector.
-        */
-                    final Vector3 difference = Vector3.subtract(point1, point2);
-                    final Vector3 directionFromTopToBottom = difference.normalized();
-                    final Quaternion rotationFromAToB =
-                            Quaternion.lookRotation(directionFromTopToBottom, Vector3.up());
-                    Texture.Sampler sampler = Texture.Sampler.builder()
-                            .setMinFilter(Texture.Sampler.MinFilter.LINEAR_MIPMAP_LINEAR)
-                            .setMagFilter(Texture.Sampler.MagFilter.LINEAR)
-                            // .setWrapModeR(Texture.Sampler.WrapMode.REPEAT)
-                            // .setWrapModeS(Texture.Sampler.WrapMode.REPEAT)
-                            // .setWrapModeT(Texture.Sampler.WrapMode.REPEAT)
-                            .build();
-                       Toast.makeText(this, String.valueOf(difference.length()), Toast.LENGTH_SHORT).show();
-
-                    Texture.builder()
-                            .setSource(() -> getApplicationContext().getAssets().open("arrow_texture.png"))
-                            .setSampler(sampler)
-                            .build().thenAccept(texture -> {
-                                MaterialFactory.makeTransparentWithTexture(getApplicationContext(), texture) //new Color(0, 255, 244))
-                                        .thenAccept(
-                                                material -> {
-                                                    ModelRenderable model = ShapeFactory.makeCube(
-                                                            new Vector3(.2f, .008f, difference.length()*10f),
-                                                            Vector3.zero(), material);
-/* Last, set the world rotation of the node to the rotation calculated earlier and set the world position to
-       the midpoint between the given points . */
-                                                    Node node = new Node();
-                                                    node.setParent(anchorNode);
-                                                    node.setRenderable(model);
-                                                    node.setLocalPosition(Vector3.add(point1, point2).scaled(.5f));
-                                                    node.setLocalPosition(
-                                                            new Vector3(node.getLocalPosition().x, -.5f, node.getLocalPosition().z));
-                                                    // node.setLocalPosition(new Vector3(0f, -.5f, -0.5f));
-                                                    node.setWorldRotation(rotationFromAToB);
-
-                                                    Log.d("Pose position"+routeNav.size()," X " + node.getWorldPosition().x + " Y " +  node.getWorldPosition().y +
-                                                            " Z " + node.getWorldPosition().z);
-                                                    Log.d("Pose rotation"+routeNav.size()," X " + node.getWorldRotation().x + " Y " +  node.getWorldRotation().y +
-                                                            " Z " + node.getWorldRotation().z);
-                                                }
-                                        );
-                            });
-                    lastAnchorNode = anchorNode;
-                }
-            }
-  //          break;
-       // }
-    }
-
-    public List<Vector3> routeTo3DPositions(List<LatLng> route, LatLng referencePoint) {
-        final double EARTH_RADIUS = 637100;
-        double lat1Rad = Math.toRadians(referencePoint.latitude);
-        double lon1Rad = Math.toRadians(referencePoint.longitude);
-        List<Vector3> positions = new ArrayList<>();
-
-        for (LatLng point : route) {
-            double lat2Rad = Math.toRadians(point.latitude);
-            double lon2Rad = Math.toRadians(point.longitude);
-
-            double x = (lon2Rad - lon1Rad) * Math.cos((lat1Rad + lat2Rad) / 2) * EARTH_RADIUS;
-            double y = (lat2Rad - lat1Rad) * EARTH_RADIUS;
-
-            positions.add(new Vector3( (float) x, (float) 0, (float) y)); // Assuming altitude is 0 for simplicity
-        }
-
-        return positions;
-    }
-
-    public void checkPermission(String permission, int requestCode)
-    {
-        // Checking if permission is not granted
-        if (ContextCompat.checkSelfPermission(ARActivity.this, permission) == PackageManager.PERMISSION_DENIED) {
-            ActivityCompat.requestPermissions(ARActivity.this,
-                    new String[]{
-                            android.Manifest.permission.ACCESS_FINE_LOCATION,
-                            android.Manifest.permission.ACCESS_COARSE_LOCATION,
-                            Manifest.permission.CAMERA,
-                            android.Manifest.permission.BLUETOOTH_SCAN,
-                            android.Manifest.permission.BLUETOOTH_CONNECT}, requestCode);
-
-        }
-    }
 
     @Override
     public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] results) {
@@ -1174,13 +862,26 @@ public class ARActivity extends AppCompatActivity {
             tts.shutdown();
         }
         arrived=true;
+        sensorManager.unregisterListener(this);
+        sensorManager= null;
+        sensor=null;
     }
-
 
 
     @Override
     protected void onResume() {
         super.onResume();
+        Sensor accelerometer = sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER);
+        if (accelerometer != null) {
+            sensorManager.registerListener(this, accelerometer,
+                    SensorManager.SENSOR_DELAY_NORMAL, SensorManager.SENSOR_DELAY_UI);
+        }
+        Sensor magneticField = sensorManager.getDefaultSensor(Sensor.TYPE_MAGNETIC_FIELD);
+        if (magneticField != null) {
+            sensorManager.registerListener(this, magneticField,
+                    SensorManager.SENSOR_DELAY_NORMAL, SensorManager.SENSOR_DELAY_UI);
+        }
+
         if (!CameraPermissionHelper.hasCameraPermission(this)) {
             CameraPermissionHelper.requestCameraPermission(this);
             return;
@@ -1219,4 +920,39 @@ public class ARActivity extends AppCompatActivity {
 
     }
 
+    @Override
+    public void onSensorChanged(SensorEvent sensorEvent) {
+        switch (sensorEvent.sensor.getType())
+        {
+            case Sensor.TYPE_MAGNETIC_FIELD:
+                mags = sensorEvent.values.clone();
+                break;
+            case Sensor.TYPE_ACCELEROMETER:
+                accels = sensorEvent.values.clone();
+                break;
+        }
+
+        if (mags != null && accels != null) {
+            Rot = new float[9];
+            I= new float[9];
+            SensorManager.getRotationMatrix(Rot, I, accels, mags);
+            // Correct if screen is in Landscape
+
+            float[] outR = new float[9];
+            SensorManager.remapCoordinateSystem(Rot, SensorManager.AXIS_X,SensorManager.AXIS_Z, outR);
+            SensorManager.getOrientation(outR, values);
+
+//            azimuth= values[0];
+            azimuth = values[0] * 57.2957795f; //looks like we don't need this one
+            pitch =values[1] * 57.2957795f;
+            roll = values[2] * 57.2957795f;
+            mags = null; //retrigger the loop when things are repopulated
+            accels = null; ////retrigger the loop when things are repopulated
+        }
+    }
+
+    @Override
+    public void onAccuracyChanged(Sensor sensor, int i) {
+
+    }
 }

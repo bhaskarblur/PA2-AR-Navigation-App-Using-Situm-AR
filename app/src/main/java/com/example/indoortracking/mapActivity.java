@@ -41,10 +41,13 @@ import com.google.android.gms.maps.GoogleMap;
 import com.google.android.gms.maps.OnMapReadyCallback;
 import com.google.android.gms.maps.SupportMapFragment;
 import com.google.android.gms.maps.model.BitmapDescriptorFactory;
+import com.google.android.gms.maps.model.CameraPosition;
 import com.google.android.gms.maps.model.Circle;
 import com.google.android.gms.maps.model.Dash;
 import com.google.android.gms.maps.model.Dot;
 import com.google.android.gms.maps.model.Gap;
+import com.google.android.gms.maps.model.GroundOverlay;
+import com.google.android.gms.maps.model.GroundOverlayOptions;
 import com.google.android.gms.maps.model.LatLng;
 import com.google.android.gms.maps.model.LatLngBounds;
 import com.google.android.gms.maps.model.MapStyleOptions;
@@ -62,6 +65,7 @@ import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.concurrent.TimeUnit;
 
 import es.situm.sdk.SitumSdk;
 import es.situm.sdk.directions.DirectionsRequest;
@@ -78,6 +82,7 @@ import es.situm.sdk.model.cartography.Poi;
 import es.situm.sdk.model.cartography.Point;
 import es.situm.sdk.model.directions.Route;
 import es.situm.sdk.model.directions.RouteSegment;
+import es.situm.sdk.model.location.Bounds;
 import es.situm.sdk.model.location.CartesianCoordinate;
 import es.situm.sdk.model.location.Coordinate;
 import es.situm.sdk.model.location.Location;
@@ -92,8 +97,8 @@ public class mapActivity extends AppCompatActivity implements OnMapReadyCallback
     private SitumMapsLibrary mapsLibrary = null;
     private LibrarySettings librarySettings;
     private SitumMapView mapsView=null;
-    private String buildingId = "12572"; //13347  -  9640 -  12572
-    private String targetFloorId = "39250"; // 42059 - 39250
+    private String buildingId = "9640"; //13347  -  9640 -  12572 - 13278
+    private String targetFloorId = "42059"; // 42059 - 39250
 
     private String selectedPoiName;
     // 42059
@@ -139,10 +144,13 @@ public class mapActivity extends AppCompatActivity implements OnMapReadyCallback
     public static final List<PatternItem> PATTERN_POLYGON_ALPHA = Arrays.asList(GAP, DASH);
     private Boolean NotoutsideRoute=true;
 
+    private Boolean initialZoom=false;
+    private Boolean isUpdated=false;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        binding = ActivityMapBinding.inflate(getLayoutInflater());
+       binding = ActivityMapBinding.inflate(getLayoutInflater());
         setContentView(binding.getRoot());
         commons = new commons();
         sharedPreferences= getSharedPreferences("settings", MODE_PRIVATE);
@@ -152,10 +160,9 @@ public class mapActivity extends AppCompatActivity implements OnMapReadyCallback
         lineType=sharedPreferences.getInt("lineType", 0);
         enableLoc();
         SitumSdk.init(mapActivity.this);
-
+        SitumSdk.configuration().setCacheMaxAge(30, TimeUnit.SECONDS);
         load_map2();
         setupTTs();
-       // loadMap();
     }
 
 
@@ -187,12 +194,6 @@ public class mapActivity extends AppCompatActivity implements OnMapReadyCallback
 
 
 
-            }
-        });
-        binding.emrText.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-           //     speakTTs("hi there!");
             }
         });
 
@@ -254,10 +255,11 @@ public class mapActivity extends AppCompatActivity implements OnMapReadyCallback
             public void onClick(View v) {
                 // selects the next POI for exit and then calculates the route.
                 clearMap();
+                removePolylines();
                 binding.buttonsLayout.setVisibility(View.GONE);
                 showAllRoutes=true;
                 isNavigating = false;
-                poiplaced=false;
+                //poiplaced=false;
 
             }
         });
@@ -284,6 +286,7 @@ public class mapActivity extends AppCompatActivity implements OnMapReadyCallback
                     @Override
                     public void onSuccess(Collection<Poi> pois) {
                         for(Poi poi:pois) {
+                            removePolylines();
                             if(marker1.getTitle().toString().equals(poi.getName())) {
 
                                 selectedCoordinateX=String.valueOf(marker1.getPosition().latitude);
@@ -291,12 +294,11 @@ public class mapActivity extends AppCompatActivity implements OnMapReadyCallback
                                 selectedPoiId= poi.getIdentifier();
                                 selectedPoiName= poi.getName().toString();
                                 CartesianCoordinate cartesianCoordinate = coordinateConverter.toCartesianCoordinate(coordinate);
-                                //Toast.makeText(mapActivity.this, marker.getTitle(), Toast.LENGTH_SHORT).show();
                                 targetCoordinate= coordinate;
                                 isNavigating = false;
                                 arrived=false;
                                 showAllRoutes=false;
-                                removePolylines();
+
                                // Toast.makeText(mapActivity.this, "switched to single", Toast.LENGTH_SHORT).show();
                                 binding.buttonsLayout.setVisibility(View.VISIBLE);
                                 // Navigate the user now, use navigation start and listener.
@@ -332,32 +334,6 @@ public class mapActivity extends AppCompatActivity implements OnMapReadyCallback
         },1000);
     }
 
-    private void loadMap() {
-        locationManager=SitumSdk.locationManager();
-        librarySettings = new LibrarySettings();
-        librarySettings.setMinZoom(25);
-        librarySettings.setHasSearchView(false);
-        librarySettings.setApiKey(commons.getAPI_EMAIL(), commons.getAPI_KEY());
-        librarySettings.setUserPositionIcon("situm_position_icon.png");
-        librarySettings.setUserPositionArrowIcon("itum_position_icon_arrow.png");
-        mapsLibrary = new SitumMapsLibrary(R.id.maps_library_target, this, librarySettings);
-        mapsLibrary.load();
-
-
-
-        new Handler().postDelayed(new Runnable() {
-            @Override
-            public void run() {
-                mapsLibrary.enableOneBuildingMode(buildingId);
-                mapsLibrary.startPositioning(buildingId);
-                startLocation();
-                librarySettings.setShowNavigationIndications(true);
-            }
-        },500);
-
-    }
-
-
     private void startNavigation(Location location) {
             // Removes previous navigation (just in case)
             SitumSdk.navigationManager().removeUpdates();
@@ -380,9 +356,9 @@ public class mapActivity extends AppCompatActivity implements OnMapReadyCallback
                     NavigationRequest navigationRequest = new NavigationRequest.Builder().
                             // Navigation will take place along this route
                                     route(route).
-                            distanceToChangeIndicationThreshold(2).
+//                            distanceToChangeIndicationThreshold(2).
                             // ... stopping when we're closer than 4 meters to the destination
-                                    distanceToGoalThreshold(3).
+                                    distanceToGoalThreshold(4).
                             // ... or we're farther away than 10 meters from the route
                                     outsideRouteThreshold(3).
                             // Low quality locations will not be taken into account when updating the navigation state
@@ -400,7 +376,7 @@ public class mapActivity extends AppCompatActivity implements OnMapReadyCallback
 
                 @Override
                 public void onFailure(Error error) {
-                    Toast.makeText(mapActivity.this, "You are not inside building", Toast.LENGTH_SHORT).show();
+                    Toast.makeText(mapActivity.this, "Failed to get create navigation.", Toast.LENGTH_SHORT).show();
                     Log.e(TAG, "Navigation Failed" + error);
                 }
             });
@@ -438,43 +414,27 @@ public class mapActivity extends AppCompatActivity implements OnMapReadyCallback
         @Override
         public void onProgress(NavigationProgress navigationProgress) {
             if(!arrived) {
-               // Toast.makeText(mapActivity.this,"current floor:"+
-                 //       navigationProgress.getClosestLocationInRoute().getFloorIdentifier(), Toast.LENGTH_SHORT).show();
                 Log.i(TAG, "Route advances");
                 hideProgress();
-                NotoutsideRoute=true;
-                speakTTs(navigationProgress.getNextIndication().toText(mapActivity.this));
-                Toast.makeText(mapActivity.this, navigationProgress.getNextIndication().toText(mapActivity.this), Toast.LENGTH_SHORT).show();
-                //   FloorSelectorView floorSelectorView = findViewById(R.id.situm_floor_selector);
-                //  floorSelectorView.setFloorSelector(buildingInfo_.getBuilding(), googleMap, targetFloorId);
-                //  getPoisUseCase= new GetPoisUseCase(buildingInfo_.getBuilding());
-                //  getPois(googleMap);
+                NotoutsideRoute = true;
                 Log.d("navigation", navigationProgress.toString());
-                new Handler().postDelayed(new Runnable() {
-                    @Override
-                    public void run() {
-                        //speakTTs(navigationProgress.getCurrentIndication().toText(mapActivity.this));
-                    }
-                },6000);
 
-                drawChosenRoute(navigationProgress.getSegments());
+
+                if(!isUpdated) {
+                    speakTTs(navigationProgress.getNextIndication().toText(mapActivity.this));
+                  //  Toast.makeText(mapActivity.this, navigationProgress.getNextIndication().toText(mapActivity.this), Toast.LENGTH_SHORT).show();
+                    drawChosenRoute(navigationProgress.getSegments());
+                    new Handler().postDelayed(new Runnable() {
+                        @Override
+                        public void run() {
+                            isUpdated=false;
+                        }
+                    }, 6000);
+                }
+
+                isUpdated=true;
+
             }
-//            Log.i(TAG, "Current indication " + navigationProgress.getCurrentIndication().toText(ARActivity.this));
-//            Log.i(TAG, "Next indication " + navigationProgress.getNextIndication().toText(ARActivity.this));
-//            Log.i(TAG, "");
-//            Log.i(TAG, " Distance to goal: " + navigationProgress.getDistanceToGoal());
-//            Log.i(TAG, " Time to goal: " + navigationProgress.getTimeToGoal());
-//            Log.i(TAG, " Closest location in route: " + navigationProgress.getClosestLocationInRoute());
-//            Log.i(TAG, " Distance to closest location in route: " + navigationProgress.getDistanceToClosestPointInRoute());
-//            Log.i(TAG, " Remaining segments: ");
-//            for (RouteSegment segment : navigationProgress.getSegments()) {
-//                Log.i(TAG, "   Floor Id: " + segment.getFloorIdentifier());
-//                for (Point point : segment.getPoints()) {
-//                    Log.i(TAG, "    Point: BuildingId " + point.getFloorIdentifier() + " FloorId " + point.getFloorIdentifier() + " Latitude " + point.getCoordinate().getLatitude() + " Longitude " + point.getCoordinate().getLongitude());
-//                }
-//                Log.i(TAG, "    ----");
-//            }
-//            Log.i(TAG, "--------");
 
         }
 
@@ -500,20 +460,6 @@ public class mapActivity extends AppCompatActivity implements OnMapReadyCallback
     };
 
     private void startLocation() {
-        SitumSdk.communicationManager().fetchFloorsFromBuilding(buildingId, new es.situm.sdk.utils.Handler<Collection<Floor>>() {
-            @Override
-            public void onSuccess(Collection<Floor> floors) {
-                for (Floor floor : floors) {
-//                    Toast.makeText(mapActivity.this, floor.getName().toString()+", "
-//                            +floor.getIdentifier().toString(), Toast.LENGTH_SHORT).show();
-                }
-            }
-
-            @Override
-            public void onFailure(Error error) {
-
-            }
-        });
         if (locationManager.isRunning()) {
             return;
         }
@@ -528,13 +474,10 @@ public class mapActivity extends AppCompatActivity implements OnMapReadyCallback
                 current=latLng;
 
                 //current floor at which user is
-
-
                 if(!location.getFloorIdentifier().equals("-1")) {
                     targetFloorId=location.getFloorIdentifier();
 
                     if (!poiplaced) {
-
                         SitumSdk.communicationManager().fetchBuildingInfo(buildingId, new es.situm.sdk.utils.Handler<BuildingInfo>() {
                             @Override
                             public void onSuccess(BuildingInfo buildingInfo) {
@@ -546,13 +489,23 @@ public class mapActivity extends AppCompatActivity implements OnMapReadyCallback
                                                 floor.getName() + ". Please choose the closest route to exit.");
                                         coordinateConverter = new CoordinateConverter(buildingInfo.getBuilding().getDimensions(),
                                                 buildingInfo.getBuilding().getCenter(), buildingInfo.getBuilding().getRotation());
-                                        Toast.makeText(mapActivity.this, "You are at floor: "+location.getFloorIdentifier().toString(), Toast.LENGTH_SHORT).show();
-                                        Toast.makeText(mapActivity.this, "Floor that will be shown:"
-                                                +floor.getName()+", "+floor.getIdentifier().toString(), Toast.LENGTH_SHORT).show();
+//                                        Toast.makeText(mapActivity.this, "You are at floor: "+location.getFloorIdentifier().toString(), Toast.LENGTH_SHORT).show();
+//                                        Toast.makeText(mapActivity.this, "Floor that will be shown:"
+//                                                +floor.getName()+", "+floor.getIdentifier().toString(), Toast.LENGTH_SHORT).show();
                                         FloorSelectorView floorSelectorView = findViewById(R.id.situm_floor_selector);
                                         floorSelectorView.setFloorSelector(buildingInfo.getBuilding(), googleMap, targetFloorId);
                                         floorSelectorView.setFloorList(buildingInfo.getFloors());
-                                        floorSelectorView.updatePositioningFloor(targetFloorId);
+                                        SitumSdk.communicationManager().fetchMapFromFloor(floor, new es.situm.sdk.utils.Handler<Bitmap>() {
+                                            @Override
+                                            public void onSuccess(Bitmap bitmap) {
+                                                drawBitmap(bitmap, buildingInfo.getBuilding(), floor);
+                                            }
+
+                                            @Override
+                                            public void onFailure(Error error) {
+
+                                            }
+                                        });
                                         getPoisUseCase = new GetPoisUseCase(buildingInfo.getBuilding());
                                         getPois(googleMap);
                                         poiplaced = true;
@@ -561,20 +514,26 @@ public class mapActivity extends AppCompatActivity implements OnMapReadyCallback
                                             public void onSuccess(Collection<Poi> pois) {
                                                 for (Poi poi : pois) {
                                                     if (poi.getFloorIdentifier().equals(targetFloorId)) {
-                                                        if (latLng != null) {
-                                                            if (showAllRoutes) {
-                                                                removePolylines();
-                                                                calculateRoute(markerName.getPosition(), poi.getCoordinate(), poi.getCartesianCoordinate());
-                                                            } else {
-                                                                if (isNavigating) {
-                                                                    SitumSdk.navigationManager().updateWithLocation(location);
+                                                        new Handler().postDelayed(new Runnable() {
+                                                            @Override
+                                                            public void run() {
+                                                                if (latLng != null) {
+                                                                    if (showAllRoutes) {
+                                                                        removePolylines();
+                                                                        calculateRoute(markerName.getPosition(), poi.getCoordinate(), poi.getCartesianCoordinate());
+                                                                    } else {
+                                                                        removePolylines();
+                                                                        if (isNavigating) {
+                                                                            SitumSdk.navigationManager().updateWithLocation(location);
 
-                                                                } else {
-                                                                    removePolylines();
-                                                                    startNavigation(location);
+                                                                        } else {
+                                                                            startNavigation(location);
+                                                                        }
+                                                                    }
                                                                 }
                                                             }
-                                                        }
+                                                        },1000);
+
                                                     }
                                                 }
 
@@ -620,7 +579,26 @@ public class mapActivity extends AppCompatActivity implements OnMapReadyCallback
                                 .icon(BitmapDescriptorFactory.fromBitmap(icon))
                                 .draggable(false));
                     }
-                    googleMap.moveCamera(CameraUpdateFactory.newLatLngZoom(latLng, 25));
+
+
+                    if(!initialZoom) {
+//                        CameraPosition cameraPosition = new CameraPosition.Builder()
+//                                .target(latLng)
+//                                .zoom(17)                   // Sets the zoom
+//                                .bearing(0)                // Sets the orientation of the camera to east
+//                                .tilt(135)                   // Sets the tilt of the camera to 30 degrees
+//                                .build();
+//                        googleMap.moveCamera(CameraUpdateFactory.newCameraPosition(cameraPosition));
+
+
+                        googleMap.moveCamera(CameraUpdateFactory.newLatLngZoom(latLng, 21));
+                        initialZoom=true;
+                    }
+                     else {
+                        //googleMap.moveCamera(CameraUpdateFactory.newLatLng(latLng));
+
+                    }
+
 
                     SitumSdk.communicationManager().fetchIndoorPOIsFromBuilding(buildingId, new es.situm.sdk.utils.Handler<Collection<Poi>>() {
                         @Override
@@ -662,6 +640,7 @@ public class mapActivity extends AppCompatActivity implements OnMapReadyCallback
 
             @Override
             public void onStatusChanged(@NonNull LocationStatus locationStatus) {
+                //Toast.makeText(mapActivity.this, "Status: "+locationStatus, Toast.LENGTH_SHORT).show();
                 Log.d("Location Status", "Status Changed: "+locationStatus.toString());
             }
 
@@ -679,16 +658,38 @@ public class mapActivity extends AppCompatActivity implements OnMapReadyCallback
                 useDeadReckoning(true)
                 .useForegroundService(false)
                 .build();
+      
         locationManager.requestLocationUpdates(locationRequest, locationListener);
 
     }
+    private GroundOverlay groundOverlay;
+
+    private void drawBitmap(Bitmap bitmap, Building building, Floor floor) {
+       // Toast.makeText(this,floor.getName().toString(), Toast.LENGTH_SHORT).show();
+        Bounds drawBounds = building.getBounds();
+        Coordinate coordinateNE = drawBounds.getNorthEast();
+        Coordinate coordinateSW = drawBounds.getSouthWest();
+        LatLngBounds latLngBounds = new LatLngBounds(
+                new LatLng(coordinateSW.getLatitude(), coordinateSW.getLongitude()),
+                new LatLng(coordinateNE.getLatitude(), coordinateNE.getLongitude()));
+
+        if (groundOverlay != null) {
+            groundOverlay.remove();
+        }
+
+        groundOverlay = googleMap.addGroundOverlay(new GroundOverlayOptions()
+                .image(BitmapDescriptorFactory.fromBitmap(bitmap))
+                .bearing((float) building.getRotation().degrees())
+                .positionFromBounds(latLngBounds));
+
+    }
+
     private void stopLocation() {
         if (!locationManager.isRunning()) {
             return;
         }
         locationManager.removeUpdates(locationListener);
     }
-
 
     private void getPois(final GoogleMap googleMap){
         getPoisUseCase.get(new GetPoisUseCase.Callback() {
@@ -771,7 +772,6 @@ public class mapActivity extends AppCompatActivity implements OnMapReadyCallback
 
         result.addOnCompleteListener(new OnCompleteListener<LocationSettingsResponse>() {
 
-
             @Override
             public void onComplete(Task<LocationSettingsResponse> task) {
                 try {
@@ -834,9 +834,11 @@ public class mapActivity extends AppCompatActivity implements OnMapReadyCallback
         googleMap.getUiSettings().setMapToolbarEnabled(false);
         googleMap.getUiSettings().setMyLocationButtonEnabled(false);
         googleMap.setBuildingsEnabled(false);
+        googleMap.setMinZoomPreference(16);
         googleMap.setMapStyle(
                 MapStyleOptions.loadRawResourceStyle(
                         this, R.raw.google_map_style));
+       // Toast.makeText(this, buildingId, Toast.LENGTH_SHORT).show();
         startLocation();
 
     }
@@ -1000,6 +1002,7 @@ public class mapActivity extends AppCompatActivity implements OnMapReadyCallback
 
         }
     }
+
     private void drawRoute(Route route) {
         for (RouteSegment segment : route.getSegments()) {
             //For each segment you must draw a polyline
@@ -1108,10 +1111,10 @@ public class mapActivity extends AppCompatActivity implements OnMapReadyCallback
             navColor = sharedPreferences.getInt("navColor", 3);
             voice = sharedPreferences.getBoolean("voice", false);
             lineType=sharedPreferences.getInt("lineType", 0);
+            removePolylines();
         }
 
     }
-
 
     @Override
     public void finish() {

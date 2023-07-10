@@ -29,6 +29,7 @@ import java.util.List;
 import es.situm.sdk.SitumSdk;
 import es.situm.sdk.error.Error;
 import es.situm.sdk.model.cartography.Building;
+import es.situm.sdk.model.cartography.BuildingInfo;
 import es.situm.sdk.model.cartography.Floor;
 import es.situm.sdk.model.location.Bounds;
 import es.situm.sdk.model.location.Coordinate;
@@ -107,7 +108,6 @@ public class FloorSelectorView extends ConstraintLayout {
                 // First, store in the reverse order the collection
                 floorList = new ArrayList<>(floorsCollection);
                 Collections.reverse(floorList);
-                updatePositioningFloor(floorId);
                 // Once we got the floors we prepare de selector
                 prepareSelector();
             }
@@ -158,7 +158,7 @@ public class FloorSelectorView extends ConstraintLayout {
         SitumSdk.communicationManager().fetchMapFromFloor(newFloor, new Handler<Bitmap>() {
             @Override
             public void onSuccess(Bitmap bitmap) {
-                drawFloor(bitmap);
+                //  here drawFloor()
                 floorAdapter.select(newFloor);
             }
 
@@ -198,6 +198,7 @@ public class FloorSelectorView extends ConstraintLayout {
 
     private void onError(Error error) {
         Log.e("onError()", error.getMessage());
+        Toast.makeText(getContext(), "Error loading the correct Floor Map", Toast.LENGTH_SHORT).show();
         Toast.makeText(getContext(), "There was an error", Toast.LENGTH_SHORT).show();
     }
 
@@ -208,16 +209,15 @@ public class FloorSelectorView extends ConstraintLayout {
      */
     public void updatePositioningFloor(String positioningFloorId) {
         Floor newFloor = searchFloorById(positioningFloorId);
-
         SitumSdk.communicationManager().fetchMapFromFloor(newFloor, new Handler<Bitmap>() {
             @Override
             public void onSuccess(Bitmap bitmap) {
-                if(focusUserMarker) {
-                    drawFloor(bitmap);
-                    selector.scrollToPosition(floorList.indexOf(newFloor));
-                }
 
-            //    floorAdapter.positioningFloorChangedTo(newFloor, focusUserMarker);
+                // here drawFloor()
+                    //drawFloor(bitmap);
+//                floorAdapter.select(newFloor);
+                    selector.scrollToPosition(floorList.indexOf(newFloor));
+
             }
 
             @Override
