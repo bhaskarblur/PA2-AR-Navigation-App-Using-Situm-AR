@@ -156,7 +156,7 @@ public class ARActivity extends AppCompatActivity implements SensorEventListener
         SitumSdk.init(this);
         SitumSdk.configuration().setCacheMaxAge(30, TimeUnit.SECONDS);
         sharedPreferences = getSharedPreferences("settings", MODE_PRIVATE);
-        voice = sharedPreferences.getBoolean("voice", true);
+        voice = sharedPreferences.getBoolean("voice", false);
         fillbuildingData();
         setupTTs();
         maybeEnableArButton();
@@ -548,7 +548,7 @@ public class ARActivity extends AppCompatActivity implements SensorEventListener
                         // Navigation will take place along this route
                                 route(route).
                         //indicationsInterval(300)
-//                        distanceToChangeIndicationThreshold(2).
+                        distanceToChangeIndicationThreshold(3).
 
                         // ... stopping when we're closer than 4 meters to the destination
                                 // change this later

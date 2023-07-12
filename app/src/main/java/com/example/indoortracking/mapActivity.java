@@ -146,6 +146,7 @@ public class mapActivity extends AppCompatActivity implements OnMapReadyCallback
 
     private Boolean initialZoom=false;
     private Boolean isUpdated=false;
+    boolean zoomed=false;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -155,7 +156,7 @@ public class mapActivity extends AppCompatActivity implements OnMapReadyCallback
         commons = new commons();
         sharedPreferences= getSharedPreferences("settings", MODE_PRIVATE);
         routeColor=sharedPreferences.getInt("routeColor",3);
-        navColor=sharedPreferences.getInt("navColor",3);
+        navColor=sharedPreferences.getInt("navColor",-1);
         voice=sharedPreferences.getBoolean("voice", false);
         lineType=sharedPreferences.getInt("lineType", 0);
         enableLoc();
@@ -257,19 +258,15 @@ public class mapActivity extends AppCompatActivity implements OnMapReadyCallback
                 clearMap();
                 removePolylines();
                 binding.buttonsLayout.setVisibility(View.GONE);
+                binding.navigationLayout.setVisibility(View.GONE);
                 showAllRoutes=true;
+                initialZoom=false;
                 isNavigating = false;
                 //poiplaced=false;
 
             }
         });
 
-        binding.recenter.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View view) {
-                poiplaced=false;
-            }
-        });
         googleMap.setOnMarkerClickListener(new GoogleMap.OnMarkerClickListener() {
             @Override
             public boolean onMarkerClick(@NonNull Marker marker) {
@@ -301,6 +298,7 @@ public class mapActivity extends AppCompatActivity implements OnMapReadyCallback
 
                                // Toast.makeText(mapActivity.this, "switched to single", Toast.LENGTH_SHORT).show();
                                 binding.buttonsLayout.setVisibility(View.VISIBLE);
+                                binding.navigationLayout.setVisibility(View.VISIBLE);
                                 // Navigate the user now, use navigation start and listener.
                                 //calculateSingleRoute(current,coordinate,cartesianCoordinate);
                             }
@@ -418,9 +416,51 @@ public class mapActivity extends AppCompatActivity implements OnMapReadyCallback
                 hideProgress();
                 NotoutsideRoute = true;
                 Log.d("navigation", navigationProgress.toString());
+                if(String.valueOf(navigationProgress.getDistanceToGoal()).toString().length()>5) {
+                    binding.distanceleftText.setText(String.valueOf(navigationProgress.getDistanceToGoal() * 3.281)
+                            .substring(0, 5) + "Ft");
+                }
+                else{
+                    int size= String.valueOf(navigationProgress.getDistanceToGoal()).length();
+                    binding.distanceleftText.setText(String.valueOf(navigationProgress.getDistanceToGoal() * 3.281)
+                            .substring(0, size) + "Ft");
+                }
+                boolean distanceLeftTrue = (int) navigationProgress.getDistanceToGoal()<5;
 
+                //here assuming the walk speed at 1.5m/sec
+                binding.timeleft.setText(String.valueOf((navigationProgress.getTimeToGoal()/1.5)/60)
+                        .toString().substring(0, 4)+"min");
 
-                if(!isUpdated) {
+                if(String.valueOf(navigationProgress.getDistanceToClosestPointInRoute()).toString().length()>5) {
+                    binding.nextdistancetxt.setText(String.valueOf(navigationProgress.getDistanceToClosestPointInRoute() * 3.281)
+                            .substring(0, 5) + "Ft");
+                }
+                else{
+                    int size= String.valueOf(navigationProgress.getDistanceToClosestPointInRoute()).length();
+                    binding.nextdistancetxt.setText(String.valueOf(navigationProgress.getDistanceToClosestPointInRoute() * 3.281)
+                            .substring(0, size) + "Ft");
+                }
+
+                binding.indicationText.setText(navigationProgress.getCurrentIndication().toText(mapActivity.this));
+                if(navigationProgress.getCurrentIndication()
+                        .toString().toLowerCase().contains("straight")) {
+                    binding.directionArrow.setRotation(-90);
+                }
+                else if(navigationProgress.getCurrentIndication()
+                        .toString().toLowerCase().contains("backward")) {
+                    binding.directionArrow.setRotation(180);
+                }
+                else if(navigationProgress.getCurrentIndication()
+                        .toString().toLowerCase().contains("right")) {
+                    binding.directionArrow.setRotation(0);
+                }
+                else  if(navigationProgress.getCurrentIndication()
+                        .toString().toLowerCase().contains("left")) {
+                    binding.directionArrow.setRotation(90);
+                }
+
+                    if(!isUpdated) {
+                        removePolylines();
                     speakTTs(navigationProgress.getNextIndication().toText(mapActivity.this));
                   //  Toast.makeText(mapActivity.this, navigationProgress.getNextIndication().toText(mapActivity.this), Toast.LENGTH_SHORT).show();
                     drawChosenRoute(navigationProgress.getSegments());
@@ -429,7 +469,7 @@ public class mapActivity extends AppCompatActivity implements OnMapReadyCallback
                         public void run() {
                             isUpdated=false;
                         }
-                    }, 6000);
+                    }, 5000);
                 }
 
                 isUpdated=true;
@@ -440,17 +480,17 @@ public class mapActivity extends AppCompatActivity implements OnMapReadyCallback
 
         @Override
         public void onUserOutsideRoute() {
-            AlertDialog.Builder builder = new AlertDialog.Builder(mapActivity.this);
+//            AlertDialog.Builder builder = new AlertDialog.Builder(mapActivity.this);
             if(NotoutsideRoute) {
-            builder.setNeutralButton("Ok", new DialogInterface.OnClickListener() {
-                @Override
-                public void onClick(DialogInterface dialogInterface, int i) {
-
-
-                }
-            });
-            builder.setTitle("Outside Route!");
-            builder.setMessage("You're going outside route. Follow the route").show();
+//            builder.setNeutralButton("Ok", new DialogInterface.OnClickListener() {
+//                @Override
+//                public void onClick(DialogInterface dialogInterface, int i) {
+//
+//
+//                }
+//            });
+//            builder.setTitle("Outside Route!");
+//            builder.setMessage("You're going outside route. Follow the route").show();
             Toast.makeText(mapActivity.this, "You are going outside the route", Toast.LENGTH_SHORT).show();
             isNavigating = false;
             NotoutsideRoute=false;
@@ -566,7 +606,7 @@ public class mapActivity extends AppCompatActivity implements OnMapReadyCallback
                     }
                     else {
                         Bitmap icon = BitmapFactory.decodeResource(getResources(),
-                                R.drawable.arrow_user);
+                                R.drawable.newarrow);
                         LatLngBounds.Builder builder = new LatLngBounds.Builder();
 
                         MarkerOptions markerOptions = new MarkerOptions()
@@ -582,20 +622,30 @@ public class mapActivity extends AppCompatActivity implements OnMapReadyCallback
 
 
                     if(!initialZoom) {
-//                        CameraPosition cameraPosition = new CameraPosition.Builder()
-//                                .target(latLng)
-//                                .zoom(17)                   // Sets the zoom
-//                                .bearing(0)                // Sets the orientation of the camera to east
-//                                .tilt(135)                   // Sets the tilt of the camera to 30 degrees
-//                                .build();
-//                        googleMap.moveCamera(CameraUpdateFactory.newCameraPosition(cameraPosition));
+                        CameraPosition cameraPosition = new CameraPosition.Builder()
+                                .target(latLng)
+                                .zoom(23)
+                                .tilt(0)
+                                .bearing(0)// Sets the orientation of the camera to east
+                                .build();
+                        googleMap.moveCamera(CameraUpdateFactory.newCameraPosition(cameraPosition));
 
-
-                        googleMap.moveCamera(CameraUpdateFactory.newLatLngZoom(latLng, 21));
                         initialZoom=true;
+                        zoomed= false;
                     }
                      else {
-                        //googleMap.moveCamera(CameraUpdateFactory.newLatLng(latLng));
+
+                        if(!showAllRoutes && !zoomed) {
+                            CameraPosition cameraPosition = new CameraPosition.Builder()
+                                    .target(latLng)
+                                    .zoom(23)
+                                    .tilt(50)                   // Sets the tilt of the camera to 30 degrees
+                                    .build();
+                            googleMap.animateCamera(CameraUpdateFactory.newCameraPosition(cameraPosition));
+                            zoomed = true;
+                        }
+                        else {
+                        }
 
                     }
 
@@ -747,7 +797,7 @@ public class mapActivity extends AppCompatActivity implements OnMapReadyCallback
     private void hideProgress() {
                 binding.progressBar2.setVisibility(View.GONE);
                 binding.mapsLibraryTarget.setVisibility(View.VISIBLE);
-                binding.emrLayout.setVisibility(View.VISIBLE);
+                //binding.emrLayout.setVisibility(View.VISIBLE);
     }
 
     private void showProgress() {
